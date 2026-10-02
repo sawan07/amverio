@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Copper Fork — Amverio Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f4ef;
+    --panel:#ffffff;
+    --fg:#1c1e1f;
+    --muted:#6b6f74;
+    --line:#dcd7cd;
+    --accent:#2f5d8a;
+    --accent-fg:#ffffff;
+    --bubble-user:#2f5d8a;
+    --bubble-user-fg:#ffffff;
+    --bubble-agent:#ffffff;
+    --bubble-agent-fg:#1c1e1f;
+    color-scheme: light;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#15171a;
+      --panel:#1d2023;
+      --fg:#e9e7e1;
+      --muted:#9a9da3;
+      --line:#34383d;
+      --accent:#7fb0e0;
+      --accent-fg:#101214;
+      --bubble-user:#7fb0e0;
+      --bubble-user-fg:#101214;
+      --bubble-agent:#24272b;
+      --bubble-agent-fg:#e9e7e1;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#15171a;
+    --panel:#1d2023;
+    --fg:#e9e7e1;
+    --muted:#9a9da3;
+    --line:#34383d;
+    --accent:#7fb0e0;
+    --accent-fg:#101214;
+    --bubble-user:#7fb0e0;
+    --bubble-user-fg:#101214;
+    --bubble-agent:#24272b;
+    --bubble-agent-fg:#e9e7e1;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--fg);
+    font-family:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
+    display:flex;
+    flex-direction:column;
+  }
+  .app{
+    max-width:720px;
+    width:100%;
+    margin:0 auto;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+  }
+
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 18px;
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    border-bottom:1px solid var(--line);
+    background:var(--panel);
+  }
+  .brand{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .brand .name{font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand .tag{
+    font-family:'IBM Plex Mono',ui-monospace,monospace;
+    font-size:11px;
+    letter-spacing:0.4px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+  button.new-order{
+    flex:none;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:600;
+    color:var(--accent-fg);
+    background:var(--accent);
+    border:none;
+    border-radius:999px;
+    padding:9px 16px;
+    cursor:pointer;
+  }
+  button.new-order:active{opacity:0.85}
+
+  main{
+    flex:1;
+    overflow-y:auto;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .row{display:flex;min-width:0}
+  .row.user{justify-content:flex-end}
+  .row.agent{justify-content:flex-start}
+  .bubble{
+    max-width:80%;
+    padding:10px 14px;
+    border-radius:16px;
+    font-size:14.5px;
+    line-height:1.5;
+    white-space:pre-wrap;
+    word-wrap:break-word;
+    min-width:0;
+  }
+  .row.user .bubble{
+    background:var(--bubble-user);
+    color:var(--bubble-user-fg);
+    border-bottom-right-radius:4px;
+  }
+  .row.agent .bubble{
+    background:var(--bubble-agent);
+    color:var(--bubble-agent-fg);
+    border:1px solid var(--line);
+    border-bottom-left-radius:4px;
+  }
+  .row.system .bubble{
+    background:transparent;
+    border:1px dashed var(--line);
+    color:var(--muted);
+    font-family:'IBM Plex Mono',ui-monospace,monospace;
+    font-size:12px;
+    margin:4px auto;
+  }
+  .row.system{justify-content:center}
+
+  .typing{
+    display:inline-flex;
+    gap:4px;
+    align-items:center;
+    padding:4px 2px;
+  }
+  .typing span{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--muted);
+    animation:bounce 1.2s infinite ease-in-out;
+  }
+  .typing span:nth-child(2){animation-delay:0.15s}
+  .typing span:nth-child(3){animation-delay:0.3s}
+  @keyframes bounce{
+    0%,80%,100%{transform:scale(0.6);opacity:0.5}
+    40%{transform:scale(1);opacity:1}
+  }
+
+  form{
+    display:flex;
+    gap:10px;
+    padding:12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top:1px solid var(--line);
+    background:var(--panel);
+  }
+  textarea{
+    flex:1;
+    min-width:0;
+    resize:none;
+    font-family:inherit;
+    font-size:14.5px;
+    line-height:1.4;
+    padding:10px 14px;
+    border-radius:14px;
+    border:1px solid var(--line);
+    background:var(--bg);
+    color:var(--fg);
+    max-height:120px;
+  }
+  textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+  button.send{
+    flex:none;
+    font-family:inherit;
+    font-weight:600;
+    font-size:14px;
+    color:var(--accent-fg);
+    background:var(--accent);
+    border:none;
+    border-radius:14px;
+    padding:0 18px;
+    cursor:pointer;
+  }
+  button.send:disabled{opacity:0.5;cursor:default}
+
+  .error-banner{
+    margin:0 18px;
+    padding:8px 12px;
+    border-radius:10px;
+    background:#a3702f22;
+    border:1px solid var(--future, #a3702f);
+    color:var(--fg);
+    font-size:13px;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <span class="name">The Copper Fork</span>
+        <span class="tag">AMVERIO DEMO · TABLE BOOKING &amp; ORDERING</span>
+      </div>
+      <button class="new-order" id="newOrderBtn" type="button">New order</button>
+    </header>
+
+    <main id="messages"></main>
+
+    <form id="chatForm">
+      <textarea id="input" rows="1" placeholder="Book a table or place an order…" autofocus></textarea>
+      <button class="send" id="sendBtn" type="submit">Send</button>
+    </form>
+  </div>
+
+<script>
+(function(){
+  const messagesEl = document.getElementById('messages');
+  const formEl = document.getElementById('chatForm');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('sendBtn');
+  const newOrderBtn = document.getElementById('newOrderBtn');
+
+  let threadId = null;
+  let sending = false;
+
+  function genId(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+      const r = Math.random()*16|0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  function addRow(role, text){
+    const row = document.createElement('div');
+    row.className = 'row ' + role;
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return bubble;
+  }
+
+  function addTyping(){
+    const row = document.createElement('div');
+    row.className = 'row agent';
+    row.id = 'typingRow';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble typing';
+    bubble.innerHTML = '<span></span><span></span><span></span>';
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function removeTyping(){
+    const row = document.getElementById('typingRow');
+    if (row) row.remove();
+  }
+
+  function startNewThread(greet){
+    threadId = genId();
+    messagesEl.innerHTML = '';
+    if (greet){
+      addRow('agent', "Hi, welcome to The Copper Fork. I can book you a table or take a food order (pickup or delivery) — what would you like to do?");
+    }
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    inputEl.focus();
+  }
+
+  async function sendMessage(text){
+    sending = true;
+    sendBtn.disabled = true;
+    addRow('user', text);
+    addTyping();
+    try {
+      const resp = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({thread_id: threadId, message: text})
+      });
+      removeTyping();
+      if (!resp.ok){
+        const err = await resp.json().catch(()=>({detail: 'Something went wrong.'}));
+        addRow('system', err.detail || ('Error ' + resp.status));
+        return;
+      }
+      const data = await resp.json();
+      addRow('agent', data.reply || '(no reply)');
+    } catch (e) {
+      removeTyping();
+      addRow('system', "Couldn't reach the server. Please try again.");
+    } finally {
+      sending = false;
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  formEl.addEventListener('submit', function(e){
+    e.preventDefault();
+    const text = inputEl.value.trim();
+    if (!text || sending) return;
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    sendMessage(text);
+  });
+
+  inputEl.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      formEl.requestSubmit();
+    }
+  });
+
+  inputEl.addEventListener('input', function(){
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+  });
+
+  newOrderBtn.addEventListener('click', function(){
+    startNewThread(true);
+  });
+
+  startNewThread(true);
+})();
+</script>
+</body>
+</html>
