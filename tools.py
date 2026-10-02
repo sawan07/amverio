@@ -9,6 +9,7 @@ as a tool result. Keep these boring and predictable: the model should never
 need to guess what happened.
 """
 
+import re
 from datetime import datetime, timedelta
 from data import (
     BUSINESS, TABLES, MENU, MENU_BY_ID,
@@ -19,6 +20,40 @@ from data import (
 
 def _parse_dt(date_str: str, time_str: str) -> datetime:
     return datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+
+
+def _is_valid_uk_phone(phone: str) -> bool:
+    """
+    Validates common UK phone formats (mobile + landline), tolerant of
+    spacing/punctuation: "07123 456789", "07123456789", "+44 7123 456789",
+    "+447123456789", "0044 7123 456789", "020 1234 5678", "01632 960001".
+
+    Not a full libphonenumber-grade check -- this is a demo guardrail, not
+    a telecoms validator. It just rejects obviously-wrong input (too short,
+    wrong country, random text) before a booking/order gets created.
+    """
+    if not phone or not isinstance(phone, str):
+        return False
+
+    cleaned = re.sub(r"[\s\-\.\(\)]", "", phone)
+
+    if cleaned.startswith("+44"):
+        digits = cleaned[3:]
+    elif cleaned.startswith("0044"):
+        digits = cleaned[4:]
+    elif cleaned.startswith("44") and len(cleaned) >= 12:
+        digits = cleaned[2:]
+    elif cleaned.startswith("0"):
+        digits = cleaned[1:]
+    else:
+        return False
+
+    if not digits.isdigit():
+        return False
+
+    # UK national numbers are 10 digits after the trunk "0" / country code
+    # (a handful of legacy landline ranges are 9) -- allow both.
+    return len(digits) in (9, 10)
 
 
 def _table_is_free(table_id: str, start: datetime, end: datetime) -> bool:
@@ -92,6 +127,12 @@ def book_table(date: str, time: str, party_size: int, customer_name: str, custom
     Books a table if one is available. Always call check_table_availability
     first in conversation, but this re-checks itself before committing.
     """
+    if not _is_valid_uk_phone(customer_phone):
+        return {
+            "success": False,
+            "reason": "That doesn't look like a valid UK phone number. Please provide one, e.g. 07123 456789 or +44 7123 456789.",
+        }
+
     availability = check_table_availability(date, time, party_size)
     if not availability["available"]:
         return {"success": False, "reason": availability.get("reason", "No table available.")}
@@ -127,6 +168,12 @@ def place_order(items: list, order_type: str, customer_name: str, customer_phone
     """
     if order_type not in ("pickup", "delivery"):
         return {"success": False, "reason": "order_type must be 'pickup' or 'delivery'."}
+
+    if not _is_valid_uk_phone(customer_phone):
+        return {
+            "success": False,
+            "reason": "That doesn't look like a valid UK phone number. Please provide one, e.g. 07123 456789 or +44 7123 456789.",
+        }
 
     line_items = []
     total = 0.0
