@@ -87,6 +87,28 @@ def main():
         "Table for 12 tonight at 7, name Jordan, 07999888777.",
     ])
 
+    run_scenario(client, "Book then cancel a reservation", [
+        "Hi, can I book a table for 2 this Saturday at 7pm? Jordan Blake, 07111 222333.",
+        "Actually, I need to cancel that booking.",
+    ])
+
+    run_scenario(client, "Reschedule an existing reservation (no reschedule tool -- cancel+recreate expected)", [
+        "I'd like a table for 4 this Sunday at 8pm. Priya Shah, 07222 333444.",
+        "Actually can you move that to 9pm instead on the same day?",
+    ])
+
+    run_scenario(client, "Add items, then change mind before confirming", [
+        "Hi, I'd like to order two chargrilled chicken burgers for pickup.",
+        "Actually, make that one burger, and add a side of fries instead.",
+        "Yes that's right, go ahead. Sam Lee, 07099 888777.",
+    ])
+
+    run_scenario(client, "Remove an item entirely before confirming", [
+        "Can I get a soup of the day and a bramley apple crumble for pickup?",
+        "Actually scrap the crumble, just the soup please.",
+        "Yes confirm that. Priya Shah, 07222 333444.",
+    ])
+
 
 if __name__ == "__main__":
     main()

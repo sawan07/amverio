@@ -87,6 +87,20 @@ from 2024. Fixed by injecting the real current date/time into the system
 prompt at the start of every conversation (see `chat.py`) and by having
 `check_table_availability` reject any date/time that's already passed.
 
+A second round added four more scenarios to `test_conversation.py`: booking
+then cancelling a reservation, "rescheduling" one (there's no reschedule
+tool, so this checks that the agent does cancel-and-recreate correctly --
+it also picked a better-fitting table on the rebook, since `book_table`
+always re-checks availability right before committing), and two
+before-confirmation order-change cases (reducing/swapping items, and
+dropping an item the agent correctly flagged as not on the menu). All four
+passed with no code changes needed.
+
+UK phone numbers are now validated in `tools.py` before a booking or order
+is created (`book_table` / `place_order` both reject anything that doesn't
+look like a real UK mobile/landline number, e.g. `07123 456789` or
+`+44 7123 456789`) -- format only, not a live reachability check.
+
 ## Known simplifications (intentional, for this stage)
 
 - All data is in-memory and resets on restart — not the real database.
