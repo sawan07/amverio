@@ -1,14 +1,18 @@
 """
-Web version of the Amverio Restaurant agent prototype.
+Web version of the Amverio agent prototype.
 
-Same agent logic as chat.py (same tools.py / data.py / system_prompt.md),
-just served over HTTP instead of a terminal loop, so it can sit behind a
-simple browser chat UI. Each browser tab/session keeps its own
-conversation by sending a `thread_id` with every message; the "New order"
-button in the UI just generates a fresh thread_id client-side, which
-starts a brand new conversation here (the restaurant's tables/orders data
-itself is shared across threads, same as in real life -- one restaurant,
-many customers).
+Same agent logic as chat.py, just served over HTTP instead of a terminal
+loop, so it can sit behind a simple browser chat UI. Each browser
+tab/session keeps its own conversation by sending a `thread_id` with every
+message; the "New conversation" button in the UI just generates a fresh
+thread_id client-side, which starts a brand new conversation here (the
+underlying demo data is shared across threads, same as in real life -- one
+business, many customers/donors).
+
+Which agent actually runs (restaurant booking/ordering, or fundraising
+donations) is picked by domain.py from the AMVERIO_DOMAIN environment
+variable -- this file doesn't know or care which one is active, it just
+uses whatever domain.py hands it.
 
 This is still a demo: thread history lives in memory and is lost on
 restart/redeploy. No auth, no rate limiting -- fine for a demo subdomain,
@@ -29,10 +33,10 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from openai import OpenAI
 
-from tools import TOOL_SCHEMAS, TOOL_FUNCTIONS
+import domain
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-log = logging.getLogger("amverio-restaurant")
+log = logging.getLogger("amverio")
 
 MODEL = os.environ.get("AMVERIO_MODEL", "gpt-4.1")
 MAX_TOOL_HOPS = 6          # safety cap on chained tool calls per turn
@@ -40,8 +44,6 @@ MAX_TURNS_PER_THREAD = 60  # safety cap on messages kept per thread
 THREAD_TTL_SECONDS = 60 * 60 * 6  # drop threads untouched for 6h
 
 _here = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(_here, "system_prompt.md")) as f:
-    _base_prompt = f.read()
 
 OPENAI_TOOLS = [
     {
@@ -52,7 +54,7 @@ OPENAI_TOOLS = [
             "parameters": t["input_schema"],
         },
     }
-    for t in TOOL_SCHEMAS
+    for t in domain.TOOL_SCHEMAS
 ]
 
 
@@ -62,12 +64,12 @@ def _system_prompt() -> str:
     now = datetime.now()
     return (
         f"Today's date is {now.strftime('%A, %Y-%m-%d')}, current time {now.strftime('%H:%M')}.\n\n"
-        + _base_prompt
+        + domain.SYSTEM_PROMPT_BASE
     )
 
 
 def run_tool(name: str, tool_input: dict) -> dict:
-    fn = TOOL_FUNCTIONS.get(name)
+    fn = domain.TOOL_FUNCTIONS.get(name)
     if fn is None:
         return {"error": f"Unknown tool: {name}"}
     try:
@@ -116,12 +118,26 @@ class ChatResponse(BaseModel):
     reply: str
 
 
-app = FastAPI(title="Amverio Restaurant Demo")
+app = FastAPI(title=f"Amverio Demo — {domain.BRAND_NAME}")
 
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True}
+    return {"ok": True, "domain": domain.DOMAIN}
+
+
+@app.get("/api/config")
+def config():
+    # Lets the same static/index.html render either domain's branding,
+    # greeting and labels without needing a separate HTML file per domain.
+    return {
+        "domain": domain.DOMAIN,
+        "brand_name": domain.BRAND_NAME,
+        "brand_tag": domain.BRAND_TAG,
+        "greeting": domain.GREETING,
+        "new_conversation_label": domain.NEW_CONVERSATION_LABEL,
+        "input_placeholder": domain.INPUT_PLACEHOLDER,
+    }
 
 
 @app.post("/api/chat", response_model=ChatResponse)

@@ -1,12 +1,18 @@
 """
-Text-only test harness for the Amverio restaurant agent prototype.
+Text-only test harness for the Amverio agent prototype.
 
-Run this in a terminal and talk to it like a customer would over WhatsApp.
-This proves out the conversation + tool-calling logic before any WhatsApp
-or real-backend wiring happens, per the agreed "logic first" build order.
+Run this in a terminal and talk to it like a customer/donor would over
+WhatsApp. This proves out the conversation + tool-calling logic before any
+WhatsApp or real-backend wiring happens, per the agreed "logic first" build
+order.
+
+Which agent persona runs (restaurant booking/ordering, or fundraising
+donations) is picked by domain.py from the AMVERIO_DOMAIN environment
+variable -- see domain.py for how to switch it.
 
 Usage:
     export OPENAI_API_KEY=sk-...
+    export AMVERIO_DOMAIN=fundraising   # or omit for the restaurant default
     pip install openai
     python3 chat.py
 """
@@ -18,12 +24,9 @@ from datetime import datetime
 
 from openai import OpenAI
 
-from tools import TOOL_SCHEMAS, TOOL_FUNCTIONS
+import domain
 
 MODEL = "gpt-4.1"  # swap freely; any current OpenAI model with function calling works
-
-with open("system_prompt.md") as f:
-    _base_prompt = f.read()
 
 # Ground the model in the real current date/time so "tomorrow", "this
 # Friday", etc. resolve correctly -- without this it guesses, and guesses
@@ -31,7 +34,7 @@ with open("system_prompt.md") as f:
 _now = datetime.now()
 SYSTEM_PROMPT = (
     f"Today's date is {_now.strftime('%A, %Y-%m-%d')}, current time {_now.strftime('%H:%M')}.\n\n"
-    + _base_prompt
+    + domain.SYSTEM_PROMPT_BASE
 )
 
 # Convert our provider-neutral tool schemas (name/description/input_schema)
@@ -45,12 +48,12 @@ OPENAI_TOOLS = [
             "parameters": t["input_schema"],
         },
     }
-    for t in TOOL_SCHEMAS
+    for t in domain.TOOL_SCHEMAS
 ]
 
 
 def run_tool(name: str, tool_input: dict) -> dict:
-    fn = TOOL_FUNCTIONS.get(name)
+    fn = domain.TOOL_FUNCTIONS.get(name)
     if fn is None:
         return {"error": f"Unknown tool: {name}"}
     try:
@@ -68,7 +71,7 @@ def main():
     client = OpenAI(api_key=api_key)
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    print("Connected. Talk to The Copper Fork's assistant (Ctrl+C to quit).\n")
+    print(f"Connected. Talk to {domain.BRAND_NAME}'s assistant (Ctrl+C to quit).\n")
 
     while True:
         try:

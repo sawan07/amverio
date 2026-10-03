@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>The Copper Fork — Amverio Demo</title>
+<title>Amverio Demo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -219,16 +219,16 @@
   <div class="app">
     <header>
       <div class="brand">
-        <span class="name">The Copper Fork</span>
-        <span class="tag">AMVERIO DEMO · TABLE BOOKING &amp; ORDERING</span>
+        <span class="name" id="brandName">Amverio</span>
+        <span class="tag" id="brandTag">AMVERIO DEMO</span>
       </div>
-      <button class="new-order" id="newOrderBtn" type="button">New order</button>
+      <button class="new-order" id="newOrderBtn" type="button">New conversation</button>
     </header>
 
     <main id="messages"></main>
 
     <form id="chatForm">
-      <textarea id="input" rows="1" placeholder="Book a table or place an order…" autofocus></textarea>
+      <textarea id="input" rows="1" placeholder="Type a message…" autofocus></textarea>
       <button class="send" id="sendBtn" type="submit">Send</button>
     </form>
   </div>
@@ -240,9 +240,30 @@
   const inputEl = document.getElementById('input');
   const sendBtn = document.getElementById('sendBtn');
   const newOrderBtn = document.getElementById('newOrderBtn');
+  const brandNameEl = document.getElementById('brandName');
+  const brandTagEl = document.getElementById('brandTag');
 
   let threadId = null;
   let sending = false;
+
+  // Fallback config if /api/config can't be reached -- generic enough to
+  // not look broken, but the real values always come from the server,
+  // which picks them based on AMVERIO_DOMAIN (see domain.py).
+  let CONFIG = {
+    brand_name: 'Amverio',
+    brand_tag: 'AMVERIO DEMO',
+    greeting: 'Hi! What can I help you with?',
+    new_conversation_label: 'New conversation',
+    input_placeholder: 'Type a message…',
+  };
+
+  function applyConfig(){
+    document.title = CONFIG.brand_name + ' — Amverio Demo';
+    brandNameEl.textContent = CONFIG.brand_name;
+    brandTagEl.textContent = CONFIG.brand_tag;
+    newOrderBtn.textContent = CONFIG.new_conversation_label;
+    inputEl.placeholder = CONFIG.input_placeholder;
+  }
 
   function genId(){
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -285,7 +306,7 @@
     threadId = genId();
     messagesEl.innerHTML = '';
     if (greet){
-      addRow('agent', "Hi, welcome to The Copper Fork. I can book you a table or take a food order (pickup or delivery) — what would you like to do?");
+      addRow('agent', CONFIG.greeting);
     }
     inputEl.value = '';
     inputEl.style.height = 'auto';
@@ -346,7 +367,21 @@
     startNewThread(true);
   });
 
-  startNewThread(true);
+  async function init(){
+    try {
+      const resp = await fetch('/api/config');
+      if (resp.ok){
+        const data = await resp.json();
+        CONFIG = Object.assign({}, CONFIG, data);
+      }
+    } catch (e) {
+      // Falls back to the generic CONFIG defaults above -- still usable.
+    }
+    applyConfig();
+    startNewThread(true);
+  }
+
+  init();
 })();
 </script>
 </body>
