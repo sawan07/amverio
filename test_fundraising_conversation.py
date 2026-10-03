@@ -6,8 +6,6 @@ the environment.
 """
 
 import os
-os.environ["AMVERIO_DOMAIN"] = "fundraising"
-
 import json
 from datetime import datetime
 from openai import OpenAI
@@ -15,20 +13,25 @@ import domain
 
 MODEL = "gpt-4.1"
 
+# Forces the fundraising domain regardless of what AMVERIO_DOMAIN is set to
+# in the ambient environment -- this file always tests Bright Horizons
+# Trust specifically.
+ACTIVE = domain.get_domain("fundraising")
+
 _now = datetime.now()
 SYSTEM_PROMPT = (
     f"Today's date is {_now.strftime('%A, %Y-%m-%d')}, current time {_now.strftime('%H:%M')}.\n\n"
-    + domain.SYSTEM_PROMPT_BASE
+    + ACTIVE["system_prompt_base"]
 )
 
 OPENAI_TOOLS = [
     {"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["input_schema"]}}
-    for t in domain.TOOL_SCHEMAS
+    for t in ACTIVE["tool_schemas"]
 ]
 
 
 def run_tool(name, tool_input):
-    fn = domain.TOOL_FUNCTIONS.get(name)
+    fn = ACTIVE["tool_functions"].get(name)
     if fn is None:
         return {"error": f"Unknown tool: {name}"}
     try:

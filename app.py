@@ -1,18 +1,17 @@
 """
 Web version of the Amverio agent prototype.
 
-Same agent logic as chat.py, just served over HTTP instead of a terminal
-loop, so it can sit behind a simple browser chat UI. Each browser
-tab/session keeps its own conversation by sending a `thread_id` with every
-message; the "New conversation" button in the UI just generates a fresh
-thread_id client-side, which starts a brand new conversation here (the
-underlying demo data is shared across threads, same as in real life -- one
-business, many customers/donors).
+Serves EVERY registered domain (domain.DOMAIN_IDS) at once -- the browser
+chat UI shows a picker screen first ("who would you like to talk to?"),
+and each conversation thread remembers which domain it started as. This is
+different from chat.py, the terminal harness, which has no picker and so
+still runs as a single domain picked by the AMVERIO_DOMAIN environment
+variable.
 
-Which agent actually runs (restaurant booking/ordering, or fundraising
-donations) is picked by domain.py from the AMVERIO_DOMAIN environment
-variable -- this file doesn't know or care which one is active, it just
-uses whatever domain.py hands it.
+Each browser tab/session keeps its own conversation by sending a
+`thread_id` with every message after calling POST /api/new-thread with a
+`domain`; the "New order"/"New donation" button in the UI starts a fresh
+thread in the SAME domain, and "Switch agent" goes back to the picker.
 
 This is still a demo: thread history lives in memory and is lost on
 restart/redeploy. No auth, no rate limiting -- fine for a demo subdomain,
@@ -20,7 +19,6 @@ not for production traffic.
 """
 
 import os
-import sys
 import json
 import time
 import uuid
@@ -29,7 +27,6 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from openai import OpenAI
 
@@ -45,31 +42,42 @@ THREAD_TTL_SECONDS = 60 * 60 * 6  # drop threads untouched for 6h
 
 _here = os.path.dirname(os.path.abspath(__file__))
 
-OPENAI_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": t["name"],
-            "description": t["description"],
-            "parameters": t["input_schema"],
-        },
-    }
-    for t in domain.TOOL_SCHEMAS
-]
+# One OpenAI-format tool list per domain, built lazily and cached -- avoids
+# rebuilding the same translation on every request.
+_openai_tools_cache: dict = {}
 
 
-def _system_prompt() -> str:
+def _openai_tools_for(domain_id: str) -> list:
+    if domain_id not in _openai_tools_cache:
+        cfg = domain.get_domain(domain_id)
+        _openai_tools_cache[domain_id] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t["description"],
+                    "parameters": t["input_schema"],
+                },
+            }
+            for t in cfg["tool_schemas"]
+        ]
+    return _openai_tools_cache[domain_id]
+
+
+def _system_prompt(domain_id: str) -> str:
     # Re-grounded on every new thread so the date is always "now", not
     # whenever the server process happened to start.
+    cfg = domain.get_domain(domain_id)
     now = datetime.now()
     return (
         f"Today's date is {now.strftime('%A, %Y-%m-%d')}, current time {now.strftime('%H:%M')}.\n\n"
-        + domain.SYSTEM_PROMPT_BASE
+        + cfg["system_prompt_base"]
     )
 
 
-def run_tool(name: str, tool_input: dict) -> dict:
-    fn = domain.TOOL_FUNCTIONS.get(name)
+def run_tool(domain_id: str, name: str, tool_input: dict) -> dict:
+    tool_functions = domain.get_domain(domain_id)["tool_functions"]
+    fn = tool_functions.get(name)
     if fn is None:
         return {"error": f"Unknown tool: {name}"}
     try:
@@ -79,19 +87,12 @@ def run_tool(name: str, tool_input: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# In-memory thread store. {thread_id: {"messages": [...], "last_seen": ts}}
+# In-memory thread store. Each thread remembers which domain it belongs to,
+# so /api/chat never needs the client to resend it (and can't be tricked
+# into switching a thread's domain mid-conversation).
+# {thread_id: {"domain": str, "messages": [...], "last_seen": ts}}
 # ---------------------------------------------------------------------------
 THREADS: dict[str, dict] = {}
-
-
-def _get_or_create_thread(thread_id: str) -> list:
-    _evict_stale_threads()
-    thread = THREADS.get(thread_id)
-    if thread is None:
-        thread = {"messages": [{"role": "system", "content": _system_prompt()}], "last_seen": time.time()}
-        THREADS[thread_id] = thread
-    thread["last_seen"] = time.time()
-    return thread["messages"]
 
 
 def _evict_stale_threads() -> None:
@@ -108,6 +109,10 @@ def _client() -> OpenAI:
     return OpenAI(api_key=api_key)
 
 
+class NewThreadRequest(BaseModel):
+    domain: str
+
+
 class ChatRequest(BaseModel):
     thread_id: str
     message: str
@@ -118,26 +123,39 @@ class ChatResponse(BaseModel):
     reply: str
 
 
-app = FastAPI(title=f"Amverio Demo — {domain.BRAND_NAME}")
+app = FastAPI(title="Amverio Demo")
 
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "domain": domain.DOMAIN}
+    return {"ok": True, "domains": domain.DOMAIN_IDS}
 
 
-@app.get("/api/config")
-def config():
-    # Lets the same static/index.html render either domain's branding,
-    # greeting and labels without needing a separate HTML file per domain.
-    return {
-        "domain": domain.DOMAIN,
-        "brand_name": domain.BRAND_NAME,
-        "brand_tag": domain.BRAND_TAG,
-        "greeting": domain.GREETING,
-        "new_conversation_label": domain.NEW_CONVERSATION_LABEL,
-        "input_placeholder": domain.INPUT_PLACEHOLDER,
+@app.get("/api/domains")
+def domains():
+    # Public branding only (no tool schemas/functions) -- the picker screen
+    # renders one card per entry.
+    return {"domains": domain.list_domains()}
+
+
+@app.post("/api/new-thread")
+def new_thread(req: NewThreadRequest):
+    try:
+        domain.get_domain(req.domain)
+    except KeyError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown domain: {req.domain!r}. Expected one of: {', '.join(domain.DOMAIN_IDS)}",
+        )
+
+    _evict_stale_threads()
+    thread_id = str(uuid.uuid4())
+    THREADS[thread_id] = {
+        "domain": req.domain,
+        "messages": [{"role": "system", "content": _system_prompt(req.domain)}],
+        "last_seen": time.time(),
     }
+    return {"thread_id": thread_id, "domain": req.domain}
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -148,8 +166,18 @@ def chat(req: ChatRequest):
     if not req.thread_id:
         raise HTTPException(status_code=400, detail="Missing thread_id.")
 
+    _evict_stale_threads()
+    thread = THREADS.get(req.thread_id)
+    if thread is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Unknown or expired thread_id. Start a new conversation (POST /api/new-thread with a domain).",
+        )
+    thread["last_seen"] = time.time()
+    domain_id = thread["domain"]
+    messages = thread["messages"]
+
     client = _client()
-    messages = _get_or_create_thread(req.thread_id)
     messages.append({"role": "user", "content": message})
 
     hops = 0
@@ -157,7 +185,7 @@ def chat(req: ChatRequest):
         try:
             response = client.chat.completions.create(
                 model=MODEL,
-                tools=OPENAI_TOOLS,
+                tools=_openai_tools_for(domain_id),
                 messages=messages,
             )
         except Exception as e:
@@ -179,8 +207,8 @@ def chat(req: ChatRequest):
 
         for call in msg.tool_calls:
             args = json.loads(call.function.arguments or "{}")
-            result = run_tool(call.function.name, args)
-            log.info("tool_call thread=%s name=%s args=%s", req.thread_id, call.function.name, args)
+            result = run_tool(domain_id, call.function.name, args)
+            log.info("tool_call thread=%s domain=%s name=%s args=%s", req.thread_id, domain_id, call.function.name, args)
             messages.append({
                 "role": "tool",
                 "tool_call_id": call.id,
@@ -192,13 +220,6 @@ def chat(req: ChatRequest):
         messages[:] = [messages[0]] + messages[-(MAX_TURNS_PER_THREAD - 1):]
 
     return ChatResponse(thread_id=req.thread_id, reply=reply)
-
-
-@app.post("/api/new-thread")
-def new_thread():
-    thread_id = str(uuid.uuid4())
-    _get_or_create_thread(thread_id)
-    return {"thread_id": thread_id}
 
 
 # Serve the chat UI. Keep this mounted last so /api/* above takes priority.

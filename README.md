@@ -1,53 +1,49 @@
 # Amverio — Agent Prototype
 
-Text-chat prototype for Amverio. The same agent core now runs **two
-verticals off one codebase**, picked by an environment variable:
+Text-chat prototype for Amverio. The same agent core runs **two verticals
+off one codebase**:
 
-- **restaurant** (default) — "The Copper Fork": books a table, or takes a
-  food order for pickup/delivery.
+- **restaurant** — "The Copper Fork": books a table, or takes a food order
+  for pickup/delivery.
 - **fundraising** — "Bright Horizons Trust": lists campaigns/causes and
   takes a donation (amount, cause, one-off/monthly, Gift Aid, dedication,
   anonymity).
 
 No real backend and no real payment on either vertical yet — by design,
-per the agreed "logic first" build order. Two front ends share whichever
-domain is active: a terminal chat (for local testing) and a small web chat
-UI (for the public demo).
+per the agreed "logic first" build order.
 
-## Switching domains (`AMVERIO_DOMAIN`)
+## Two ways to run it, two different switching models
 
-`domain.py` reads `AMVERIO_DOMAIN` once at import time and hands `app.py`
-and `chat.py` the right tools, system prompt, and UI branding. Nothing else
-about the deployment changes -- same app, same container, same subdomain.
+**Web demo (`app.py`) — a picker screen, no redeploy needed.** Open the
+page and you're shown a card per available agent ("The Copper Fork" /
+"Bright Horizons Trust"); picking one starts a conversation with that
+agent. Both are live in the same running server at the same time -- there
+is nothing to configure or redeploy to go from one to the other, which is
+exactly what you want live in a meeting: click "Switch agent" and pick the
+other card. Each conversation thread remembers which domain it started as
+server-side, so two people (or two tabs) can talk to different agents on
+the same deployment at once without interfering with each other.
 
-| Value (case-insensitive) | Vertical | Persona |
-|---|---|---|
-| `restaurant` (or unset) | Table booking + food ordering | The Copper Fork |
-| `fundraising` | Campaign donations | Bright Horizons Trust |
+**Terminal harness (`chat.py`) — one domain per run, via an env var.**
+There's no picker in a terminal, so `chat.py` still reads `AMVERIO_DOMAIN`
+once at startup and runs as exactly one agent for that whole session:
 
-Locally:
 ```
 export AMVERIO_DOMAIN=fundraising   # or omit for the restaurant default
 ```
 
-In Coolify: **Application → Environment Variables**, same place
-`OPENAI_API_KEY` lives. Add/edit `AMVERIO_DOMAIN`, then **redeploy** --
-env var changes need a redeploy to take effect, a plain restart won't pick
-it up. This is exactly what's planned for Monday's fundraising demo: flip
-`AMVERIO_DOMAIN` to `fundraising` and redeploy, flip it back to
-`restaurant` (or remove it) afterward.
-
-An unrecognised value raises immediately on startup rather than silently
-falling back, so a typo in Coolify fails loudly in the deploy logs instead
-of quietly serving the wrong agent.
+Both are backed by the same `domain.py` registry (`get_domain(id)` /
+`list_domains()` / `DOMAIN_IDS`) -- adding a third vertical later means
+adding one loader function there; neither `app.py`'s picker nor `chat.py`'s
+env-var switch needs to change.
 
 ## Files
 
 Shared / domain-agnostic:
-- `domain.py` — the domain switch described above. `app.py`/`chat.py` only ever import from here.
-- `app.py` — FastAPI web server exposing `/api/chat`, `/api/new-thread`, `/api/config`, serving the chat UI. This is what runs on the demo subdomain.
+- `domain.py` — the domain registry described above. `app.py`/`chat.py` only ever go through here, never import `tools.py`/`fundraising_tools.py` directly.
+- `app.py` — FastAPI web server exposing `/api/domains`, `/api/new-thread`, `/api/chat`, serving the chat UI. This is what runs on the demo subdomain.
 - `chat.py` — terminal chat loop wired to the OpenAI API (local testing only).
-- `static/index.html` — the browser chat UI. Fetches `/api/config` on load so branding/greeting/labels match whichever domain is active -- there's one HTML file, not one per vertical.
+- `static/index.html` — the browser chat UI: a picker screen (fetches `/api/domains`, renders one card per agent) plus the chat screen itself, branded per the selected domain. One HTML file serves every vertical.
 - `Dockerfile`, `requirements.txt`, `.dockerignore` — for deploying `app.py` as a container.
 
 Restaurant domain:
@@ -60,7 +56,7 @@ Fundraising domain:
 - `fundraising_data.py` — demo persona ("Bright Horizons Trust"), campaigns, in-memory donations.
 - `fundraising_tools.py` — tool functions (get_campaigns, create_donation) plus their schemas.
 - `fundraising_system_prompt.md` — the fundraising agent's instructions/personality/guardrails.
-- `test_fundraising_conversation.py` — scripted end-to-end test scenarios (forces the fundraising domain regardless of the ambient env var).
+- `test_fundraising_conversation.py` — scripted end-to-end test scenarios (always exercises the fundraising domain specifically, regardless of any ambient env var).
 
 ## To run it locally (terminal)
 
@@ -81,16 +77,15 @@ winter appeal" or "what causes are you running right now?"
 
 ```
 export OPENAI_API_KEY=sk-...
-export AMVERIO_DOMAIN=fundraising   # optional, defaults to restaurant
 pip install -r requirements.txt
 uvicorn app:app --reload --port 8000
 ```
 
-Open `http://localhost:8000` -- same agent, browser chat UI instead of a
-terminal, branded for whichever domain is active. Clicking "New order" /
-"New donation" starts a fresh conversation thread; the underlying demo data
-is still shared across threads, same as in real life (one business, many
-customers/donors).
+Open `http://localhost:8000` -- you'll see the picker screen first. Pick
+either agent to start talking to it; "Switch agent" at any point returns
+to the picker without losing the other agent's availability. "New order" /
+"New donation" starts a fresh conversation thread in the SAME domain you're
+already in.
 
 ## Deploying to the demo subdomain (Coolify)
 
@@ -103,21 +98,23 @@ Hetzner server:
    **port to 8000**.
 3. Under the app's environment variables, add `OPENAI_API_KEY` with a real
    key — set directly in Coolify, never committed to the repo. Optionally
-   set `AMVERIO_MODEL` to override the default (`gpt-4.1`), and
-   `AMVERIO_DOMAIN` to pick the vertical (see above; defaults to `restaurant`).
+   set `AMVERIO_MODEL` to override the default (`gpt-4.1`). `AMVERIO_DOMAIN`
+   is NOT read by the web demo (both verticals are always live via the
+   picker) -- it only matters if you're running `chat.py` on the server
+   directly, which isn't the normal path.
 4. Under the app's domain settings, set the domain to
    `amverio.prologicsw.com`. Coolify/Traefik handles the TLS certificate.
-5. Deploy. `GET /healthz` returns `{"ok": true, "domain": "restaurant"}`
-   (or `"fundraising"`) once it's up — useful for confirming which domain
-   actually deployed, and for Coolify's health check if you want one.
+5. Deploy. `GET /healthz` returns `{"ok": true, "domains": ["restaurant", "fundraising"]}`
+   once it's up — useful for confirming both agents actually deployed, and
+   for Coolify's health check if you want one.
 
 Notes for this demo deployment specifically:
-- Conversation state is in-memory per `thread_id` and is lost on restart or
-  redeploy — fine for a demo, not for production traffic.
+- Conversation state is in-memory per `thread_id` (including which domain
+  it belongs to) and is lost on restart or redeploy — fine for a demo, not
+  for production traffic.
 - There's no auth and no rate limiting on `/api/chat` yet — don't link this
   subdomain anywhere it'll get indexed or hammered before that's added.
-- Logs print each tool call (`tool_call thread=... name=...`) — useful for
-  watching what the agent actually does during a demo.
+- Logs print each tool call with its domain (`tool_call thread=... domain=... name=...`) — useful for watching what each agent actually does during a demo.
 
 ## Tested and verified
 
@@ -153,12 +150,26 @@ this and the model correctly calls `get_campaigns` and retries with the
 right id, so the donor never sees it. The restaurant domain's tools show
 the same self-correcting pattern with menu/table ids.
 
-Also verified: `domain.py` switches cleanly between both values (including
-case-insensitively, e.g. `FUNDRAISING`), defaults to `restaurant` when
-unset (no behavior change from before this split existed), and raises
-immediately on an unrecognised value instead of silently misbehaving.
-`app.py` and `chat.py` both import and construct correctly under either
-domain.
+**Domain registry and multi-domain serving.** `domain.py`'s registry was
+unit tested directly: `get_domain()` is case-insensitive, caches rather
+than re-importing on every call, raises `KeyError` on an unknown id, and
+`list_domains()` never leaks `tool_functions`/`tool_schemas` to the public
+branding payload. `app.py` and `chat.py` both import and construct
+correctly for every registered domain, and an unrecognised
+`AMVERIO_DOMAIN` makes `chat.py` fail loudly at startup rather than
+silently misbehaving.
+
+The actual HTTP layer was then tested end to end by running `app.py` under
+`uvicorn` and driving it with real requests: created one thread per domain,
+confirmed `/api/new-thread` rejects an unknown domain (400) and `/api/chat`
+rejects an unknown/expired `thread_id` (404), then sent messages to both
+threads interleaved -- each reply came from the correct agent (the
+restaurant thread listed the menu; the fundraising thread listed
+campaigns), and critically, asking the restaurant thread to "donate £50"
+and the fundraising thread to "book a table" were both correctly declined
+by the agent as outside what it can do -- proving a thread's domain
+binding can't leak or be confused between agents even when two
+conversations are interleaved on the same running server.
 
 ## Known simplifications (intentional, for this stage)
 
@@ -185,7 +196,9 @@ domain.
    anything that exists today). Same idea applies to fundraising
    donations/campaigns once that vertical moves past demo.
 3. Wire `chat.py`'s loop into a WhatsApp webhook via a BSP (Twilio,
-   360dialog, etc.) instead of a terminal input() loop.
+   360dialog, etc.) instead of a terminal input() loop -- each WhatsApp
+   business number would map to one domain, similar to how the web picker
+   maps a card click to one.
 4. Decide and add the real payment step (Stripe/GoCardless for donations,
    a card/online option for restaurant orders) once each vertical's
    conversation flow is proven out.

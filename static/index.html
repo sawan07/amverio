@@ -74,6 +74,80 @@
     min-width:0;
   }
 
+  /* ---------------------------------------------------------------- */
+  /* Picker screen -- "who would you like to talk to?"                 */
+  /* ---------------------------------------------------------------- */
+  .picker{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding:32px 20px;
+    gap:28px;
+  }
+  .picker-head{
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .picker-head h1{
+    margin:0;
+    font-size:22px;
+    font-weight:600;
+    letter-spacing:-0.2px;
+  }
+  .picker-head p{
+    margin:0;
+    color:var(--muted);
+    font-size:14px;
+  }
+  .domain-cards{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .domain-card{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    text-align:left;
+    width:100%;
+    padding:16px 18px;
+    border-radius:16px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--fg);
+    font-family:inherit;
+    cursor:pointer;
+    transition:border-color 0.15s, transform 0.1s;
+  }
+  .domain-card:hover{border-color:var(--accent)}
+  .domain-card:active{transform:scale(0.99)}
+  .domain-card .domain-card-name{font-weight:600;font-size:16px}
+  .domain-card .domain-card-tag{
+    font-family:'IBM Plex Mono',ui-monospace,monospace;
+    font-size:11px;
+    letter-spacing:0.4px;
+    color:var(--muted);
+  }
+  .picker-status{
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Chat screen                                                        */
+  /* ---------------------------------------------------------------- */
+  .chat-screen{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    min-height:0;
+  }
+
   header{
     display:flex;
     align-items:center;
@@ -93,6 +167,7 @@
     color:var(--muted);
     white-space:nowrap;
   }
+  .header-actions{display:flex;gap:8px;flex:none}
   button.new-order{
     flex:none;
     font-family:inherit;
@@ -106,6 +181,19 @@
     cursor:pointer;
   }
   button.new-order:active{opacity:0.85}
+  button.switch-agent{
+    flex:none;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:600;
+    color:var(--fg);
+    background:transparent;
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:9px 16px;
+    cursor:pointer;
+  }
+  button.switch-agent:active{opacity:0.7}
 
   main{
     flex:1;
@@ -217,61 +305,58 @@
 </head>
 <body>
   <div class="app">
-    <header>
-      <div class="brand">
-        <span class="name" id="brandName">Amverio</span>
-        <span class="tag" id="brandTag">AMVERIO DEMO</span>
+
+    <div class="picker" id="picker">
+      <div class="picker-head">
+        <h1>Amverio</h1>
+        <p>Choose who you'd like to talk to.</p>
       </div>
-      <button class="new-order" id="newOrderBtn" type="button">New conversation</button>
-    </header>
+      <div class="domain-cards" id="domainCards"></div>
+      <div class="picker-status" id="pickerStatus" hidden></div>
+    </div>
 
-    <main id="messages"></main>
+    <div class="chat-screen" id="chatScreen" hidden>
+      <header>
+        <div class="brand">
+          <span class="name" id="brandName">Amverio</span>
+          <span class="tag" id="brandTag">AMVERIO DEMO</span>
+        </div>
+        <div class="header-actions">
+          <button class="switch-agent" id="switchAgentBtn" type="button">Switch agent</button>
+          <button class="new-order" id="newOrderBtn" type="button">New conversation</button>
+        </div>
+      </header>
 
-    <form id="chatForm">
-      <textarea id="input" rows="1" placeholder="Type a message…" autofocus></textarea>
-      <button class="send" id="sendBtn" type="submit">Send</button>
-    </form>
+      <main id="messages"></main>
+
+      <form id="chatForm">
+        <textarea id="input" rows="1" placeholder="Type a message…"></textarea>
+        <button class="send" id="sendBtn" type="submit">Send</button>
+      </form>
+    </div>
+
   </div>
 
 <script>
 (function(){
+  const pickerEl = document.getElementById('picker');
+  const domainCardsEl = document.getElementById('domainCards');
+  const pickerStatusEl = document.getElementById('pickerStatus');
+  const chatScreenEl = document.getElementById('chatScreen');
+
   const messagesEl = document.getElementById('messages');
   const formEl = document.getElementById('chatForm');
   const inputEl = document.getElementById('input');
   const sendBtn = document.getElementById('sendBtn');
   const newOrderBtn = document.getElementById('newOrderBtn');
+  const switchAgentBtn = document.getElementById('switchAgentBtn');
   const brandNameEl = document.getElementById('brandName');
   const brandTagEl = document.getElementById('brandTag');
 
   let threadId = null;
   let sending = false;
-
-  // Fallback config if /api/config can't be reached -- generic enough to
-  // not look broken, but the real values always come from the server,
-  // which picks them based on AMVERIO_DOMAIN (see domain.py).
-  let CONFIG = {
-    brand_name: 'Amverio',
-    brand_tag: 'AMVERIO DEMO',
-    greeting: 'Hi! What can I help you with?',
-    new_conversation_label: 'New conversation',
-    input_placeholder: 'Type a message…',
-  };
-
-  function applyConfig(){
-    document.title = CONFIG.brand_name + ' — Amverio Demo';
-    brandNameEl.textContent = CONFIG.brand_name;
-    brandTagEl.textContent = CONFIG.brand_tag;
-    newOrderBtn.textContent = CONFIG.new_conversation_label;
-    inputEl.placeholder = CONFIG.input_placeholder;
-  }
-
-  function genId(){
-    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
-      const r = Math.random()*16|0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  }
+  let selectedDomainId = null;
+  let domainsById = {};  // id -> {id, brand_name, brand_tag, greeting, new_conversation_label, input_placeholder}
 
   function addRow(role, text){
     const row = document.createElement('div');
@@ -302,11 +387,90 @@
     if (row) row.remove();
   }
 
-  function startNewThread(greet){
-    threadId = genId();
+  // ---- Picker screen -------------------------------------------------
+
+  async function loadDomains(){
+    try {
+      const resp = await fetch('/api/domains');
+      if (!resp.ok) throw new Error('bad response');
+      const data = await resp.json();
+      domainsById = {};
+      (data.domains || []).forEach(function(d){ domainsById[d.id] = d; });
+      renderDomainCards();
+    } catch (e) {
+      pickerStatusEl.hidden = false;
+      pickerStatusEl.textContent = "Couldn't load the available agents. Please refresh.";
+    }
+  }
+
+  function renderDomainCards(){
+    domainCardsEl.innerHTML = '';
+    Object.values(domainsById).forEach(function(d){
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'domain-card';
+      const name = document.createElement('span');
+      name.className = 'domain-card-name';
+      name.textContent = d.brand_name;
+      const tag = document.createElement('span');
+      tag.className = 'domain-card-tag';
+      tag.textContent = d.brand_tag;
+      card.appendChild(name);
+      card.appendChild(tag);
+      card.addEventListener('click', function(){ selectDomain(d.id); });
+      domainCardsEl.appendChild(card);
+    });
+  }
+
+  async function selectDomain(domainId){
+    selectedDomainId = domainId;
+    const cfg = domainsById[domainId];
+    if (!cfg) return;
+
+    document.title = cfg.brand_name + ' — Amverio Demo';
+    brandNameEl.textContent = cfg.brand_name;
+    brandTagEl.textContent = cfg.brand_tag;
+    newOrderBtn.textContent = cfg.new_conversation_label;
+    inputEl.placeholder = cfg.input_placeholder;
+
+    pickerEl.hidden = true;
+    chatScreenEl.hidden = false;
+    inputEl.focus();
+
+    await startNewThread(true);
+  }
+
+  function backToPicker(){
+    chatScreenEl.hidden = true;
+    pickerEl.hidden = false;
+    threadId = null;
+    selectedDomainId = null;
     messagesEl.innerHTML = '';
+  }
+
+  // ---- Chat screen -----------------------------------------------------
+
+  async function startNewThread(greet){
+    if (!selectedDomainId) return;
+    messagesEl.innerHTML = '';
+    try {
+      const resp = await fetch('/api/new-thread', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({domain: selectedDomainId})
+      });
+      if (!resp.ok){
+        addRow('system', "Couldn't start a new conversation. Please try again.");
+        return;
+      }
+      const data = await resp.json();
+      threadId = data.thread_id;
+    } catch (e) {
+      addRow('system', "Couldn't reach the server. Please try again.");
+      return;
+    }
     if (greet){
-      addRow('agent', CONFIG.greeting);
+      addRow('agent', domainsById[selectedDomainId].greeting);
     }
     inputEl.value = '';
     inputEl.style.height = 'auto';
@@ -367,21 +531,9 @@
     startNewThread(true);
   });
 
-  async function init(){
-    try {
-      const resp = await fetch('/api/config');
-      if (resp.ok){
-        const data = await resp.json();
-        CONFIG = Object.assign({}, CONFIG, data);
-      }
-    } catch (e) {
-      // Falls back to the generic CONFIG defaults above -- still usable.
-    }
-    applyConfig();
-    startNewThread(true);
-  }
+  switchAgentBtn.addEventListener('click', backToPicker);
 
-  init();
+  loadDomains();
 })();
 </script>
 </body>

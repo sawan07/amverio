@@ -6,9 +6,10 @@ WhatsApp. This proves out the conversation + tool-calling logic before any
 WhatsApp or real-backend wiring happens, per the agreed "logic first" build
 order.
 
-Which agent persona runs (restaurant booking/ordering, or fundraising
-donations) is picked by domain.py from the AMVERIO_DOMAIN environment
-variable -- see domain.py for how to switch it.
+Unlike the web demo (app.py), which serves every domain at once behind a
+picker screen, this terminal harness has no picker -- it runs as ONE
+domain per process, picked by the AMVERIO_DOMAIN environment variable
+(see domain.py for the full list of available domains).
 
 Usage:
     export OPENAI_API_KEY=sk-...
@@ -28,13 +29,20 @@ import domain
 
 MODEL = "gpt-4.1"  # swap freely; any current OpenAI model with function calling works
 
+DOMAIN_ID = os.environ.get("AMVERIO_DOMAIN", "restaurant").strip().lower()
+try:
+    ACTIVE = domain.get_domain(DOMAIN_ID)
+except KeyError:
+    print(f"Unknown AMVERIO_DOMAIN={DOMAIN_ID!r}. Expected one of: {', '.join(domain.DOMAIN_IDS)}")
+    sys.exit(1)
+
 # Ground the model in the real current date/time so "tomorrow", "this
 # Friday", etc. resolve correctly -- without this it guesses, and guesses
 # wrong (verified: it defaulted to dates in 2024 during testing).
 _now = datetime.now()
 SYSTEM_PROMPT = (
     f"Today's date is {_now.strftime('%A, %Y-%m-%d')}, current time {_now.strftime('%H:%M')}.\n\n"
-    + domain.SYSTEM_PROMPT_BASE
+    + ACTIVE["system_prompt_base"]
 )
 
 # Convert our provider-neutral tool schemas (name/description/input_schema)
@@ -48,12 +56,12 @@ OPENAI_TOOLS = [
             "parameters": t["input_schema"],
         },
     }
-    for t in domain.TOOL_SCHEMAS
+    for t in ACTIVE["tool_schemas"]
 ]
 
 
 def run_tool(name: str, tool_input: dict) -> dict:
-    fn = domain.TOOL_FUNCTIONS.get(name)
+    fn = ACTIVE["tool_functions"].get(name)
     if fn is None:
         return {"error": f"Unknown tool: {name}"}
     try:
@@ -71,7 +79,7 @@ def main():
     client = OpenAI(api_key=api_key)
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    print(f"Connected. Talk to {domain.BRAND_NAME}'s assistant (Ctrl+C to quit).\n")
+    print(f"Connected. Talk to {ACTIVE['brand_name']}'s assistant (Ctrl+C to quit).\n")
 
     while True:
         try:
