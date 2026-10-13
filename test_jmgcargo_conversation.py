@@ -81,6 +81,10 @@ def main():
         "PE27 4LG. Name Sara Khan, sara.khan@example.com, 07700 900123. Contents are books and clothes. Yes go ahead.",
     ])
 
+    run_scenario(client, "Customer insists power bank is fine", [
+        "20kg to Dhaka, clothes and a small power bank. It's only a small one, that's fine right?",
+    ])
+
     run_scenario(client, "Europe rate", [
         "What would 10kg to Paris cost?",
     ])

@@ -106,6 +106,8 @@ def get_service_info() -> dict:
 
 def check_items(contents: str, destination_country: str = "", destination_city: str = "") -> dict:
     """Flag anything in a free-text contents description that JMG prohibits."""
+    if not contents or not contents.strip():
+        return {"ok": False, "reason": "No contents given -- ask the customer what's inside first."}
     region = _resolve_region(destination_country, destination_city)
     hits = _find_prohibited(contents, region)
     return {
@@ -114,8 +116,9 @@ def check_items(contents: str, destination_country: str = "", destination_city: 
         "ok": not hits,
         "note": (
             "These look like items JMG cannot send. Ask the customer to confirm "
-            "exactly what they are -- some (e.g. dry packaged food, dry-cell "
-            "batteries) may be fine and the team will check."
+            "exactly what they are -- a few (e.g. dry packaged food, ordinary "
+            "AA/AAA batteries) may be fine and the team will check. Power banks "
+            "and lithium batteries are never allowed."
             if hits else
             "Nothing obviously prohibited, but the team still checks every parcel. "
             "Remind the customer everything must be boxed."
@@ -133,9 +136,12 @@ def estimate_quote(
     pickup_required: bool = False,
     insurance: bool = False,
     express: bool = False,
+    contents: str = "",
 ) -> dict:
     """
     Works out an estimated starting price from the published per-kg rates.
+    If contents are given, they're checked against the prohibited list in
+    the same call, so the model can't skip that check.
     Either total_weight_kg, or a parcels list (weight + optional dimensions
     each), is needed.
     """
@@ -170,6 +176,19 @@ def estimate_quote(
     if chargeable > MAX_STANDARD_KG:
         notes.append(f"Over {MAX_STANDARD_KG}kg counts as a large shipment -- JMG arranges these specially and may offer a better rate.")
 
+    contents_check = None
+    if contents and contents.strip():
+        flagged = _find_prohibited(contents, region)
+        contents_check = {
+            "contents": contents,
+            "possibly_prohibited": flagged,
+            "ok": not flagged,
+            "note": (
+                "PROHIBITED -- these cannot be sent at all. Tell the customer and ask them to remove them."
+                if flagged else "Nothing on the prohibited list. Everything must be boxed."
+            ),
+        }
+
     return {
         "success": True,
         "destination": ", ".join(x for x in [destination_city, destination_country] if x),
@@ -181,6 +200,7 @@ def estimate_quote(
         "chargeable_weight_kg": chargeable,
         "estimated_from_gbp": estimate,
         "extras_to_be_confirmed": to_confirm,
+        "contents_check": contents_check if contents_check else "No contents given yet -- ask what's inside.",
         "notes": notes,
     }
 
@@ -220,7 +240,7 @@ def submit_quote_request(
 
     est = estimate_quote(
         destination_country, destination_city, total_weight_kg, num_parcels,
-        parcels, pickup_required, insurance, express,
+        parcels, pickup_required, insurance, express, contents,
     )
     if not est.get("success"):
         return est
@@ -303,7 +323,7 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "estimate_quote",
-        "description": "Calculate an estimated starting price for a shipment from JMG's published rates. Always use this for any price -- never calculate prices yourself.",
+        "description": "Calculate an estimated starting price for a shipment from JMG's published rates, and check the contents (if given) against the prohibited list. Always use this for any price -- never calculate prices yourself.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -314,6 +334,7 @@ TOOL_SCHEMAS = [
                 "pickup_required": {"type": "boolean"},
                 "insurance": {"type": "boolean"},
                 "express": {"type": "boolean"},
+                "contents": {"type": "string", "description": "What's inside, if the customer has said. Pass it whenever known -- it's checked against the prohibited list."},
             },
             "required": ["destination_country"],
         },

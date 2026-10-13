@@ -197,6 +197,19 @@ Domains can now declare `"path"` (a dedicated page at `/<path>` that opens
 straight into that agent, no picker or "Switch agent") and `"listed"`
 (whether it appears on the picker at `/`).
 
+**Tested (2026-10-13).** Tool functions unit tested directly (rates per
+region, rounding, minimum weight, volumetric weight, >100kg note, UK-to-UK
+rejected, prohibited-item matching incl. no false hits on "furniture" /
+"toilet" / "pillow", email/phone/postcode validation, estimate recalculated
+on submit). `test_jmgcargo_conversation.py` run against gpt-4.1 -- 8
+scenarios, all passing after four rounds of fixes: the model was submitting
+before reading back a summary, holding the price back until it knew the
+contents, and (most importantly) judging contents from its own knowledge
+and calling perfume "at your own risk" when JMG prohibits it. That last
+one is now enforced in code: `estimate_quote` takes `contents` and runs
+the prohibited check itself. Also verified end to end in a real browser on
+`/jmgcargo` against a running server.
+
 **Confirm with JMG before going live** (marked `ASSUMPTION` in
 `jmgcargo_data.py`): rounding up to the next whole kg, volumetric divisor
 5000, and the real collection / insurance / express charges (the bot

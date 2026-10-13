@@ -144,7 +144,7 @@ PROHIBITED_ITEMS = [
     ("Pornographic material", ["porn", "adult material"]),
     ("Medication (prescribed drugs)", ["medicine", "medication", "tablet", "pill", "drug", "prescription", "capsule", "syrup", "inhaler"]),
     ("Tobacco and tobacco products", ["tobacco", "cigarette", "cigar", "vape", "e-cigarette", "shisha"]),
-    ("Wet or lithium batteries (dry cells are fine)", ["lithium", "battery", "batteries", "power bank", "powerbank"]),
+    ("Wet or lithium batteries -- includes power banks, phone/laptop batteries and loose lithium cells (ordinary dry cells like AA/AAA are fine)", ["lithium", "battery", "batteries", "power bank", "powerbank"]),
 ]
 
 RESTRICTED_NOTE = (
