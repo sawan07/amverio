@@ -95,6 +95,36 @@ def _load_jmgcargo() -> dict:
         # demo picker at /.
         "path": "jmgcargo",
         "listed": False,
+        # JMG's own colours, taken from jmgcargo.com: navy top bar and
+        # headings, red square-cornered call-to-action buttons, dark slate
+        # text on white. Light only, like their site.
+        "theme": {
+            "color_scheme": "light",
+            "logo_url": "/brands/jmgcargo/logo.jpg",
+            "top_bar": "MON – SAT: 10am to 7pm  ·  CALL 020 7247 8878",
+            "vars": {
+                "--bg": "#f7f7f7",
+                "--panel": "#ffffff",
+                "--fg": "#28303d",
+                "--muted": "#666666",
+                "--line": "#dfe2e6",
+                "--accent": "#ea1826",
+                "--accent-fg": "#ffffff",
+                "--bubble-user": "#04295d",
+                "--bubble-user-fg": "#ffffff",
+                "--bubble-agent": "#ffffff",
+                "--bubble-agent-fg": "#28303d",
+                "--brand-fg": "#04295d",
+                "--topbar-bg": "#04295d",
+                "--topbar-fg": "#ffffff",
+                "--btn-radius": "3px",
+                "--send-radius": "3px",
+                "--tag-fg": "#ea1826",
+                "--tag-font": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                "--bubble-radius": "8px",
+                "--font": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+            },
+        },
         "system_prompt_base": system_prompt_base,
         "tool_schemas": TOOL_SCHEMAS,
         "tool_functions": TOOL_FUNCTIONS,
@@ -146,6 +176,7 @@ def list_domains() -> list:
         # agent. "listed": whether it shows as a card on the picker at /.
         entry["path"] = cfg.get("path")
         entry["listed"] = cfg.get("listed", True)
+        entry["theme"] = cfg.get("theme")
         out.append(entry)
     return out
 

@@ -62,7 +62,7 @@
     margin:0;
     background:var(--bg);
     color:var(--fg);
-    font-family:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
+    font-family:var(--font, 'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif);
     display:flex;
     flex-direction:column;
   }
@@ -161,14 +161,26 @@
     background:var(--panel);
   }
   .brand{display:flex;flex-direction:column;gap:2px;min-width:0}
-  .brand .name{font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand .name{font-weight:600;font-size:16px;color:var(--brand-fg, var(--fg));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .brand .tag{
-    font-family:'IBM Plex Mono',ui-monospace,monospace;
+    font-family:var(--tag-font, 'IBM Plex Mono',ui-monospace,monospace);
     font-size:11px;
     letter-spacing:0.4px;
-    color:var(--muted);
+    color:var(--tag-fg, var(--muted));
     white-space:nowrap;
   }
+  .brand-row{display:flex;align-items:center;gap:12px;min-width:0}
+  .brand-logo{height:44px;width:auto;flex:none;display:block}
+  .top-bar{
+    background:var(--topbar-bg);
+    color:var(--topbar-fg);
+    font-size:12px;
+    letter-spacing:0.3px;
+    text-align:center;
+    padding:7px 12px;
+    padding-top: calc(7px + env(safe-area-inset-top, 0px));
+  }
+  .top-bar:not([hidden]) + header{padding-top:14px}
   .header-actions{display:flex;gap:8px;flex:none}
   button.new-order{
     flex:none;
@@ -178,7 +190,7 @@
     color:var(--accent-fg);
     background:var(--accent);
     border:none;
-    border-radius:999px;
+    border-radius:var(--btn-radius, 999px);
     padding:9px 16px;
     cursor:pointer;
   }
@@ -191,7 +203,7 @@
     color:var(--fg);
     background:transparent;
     border:1px solid var(--line);
-    border-radius:999px;
+    border-radius:var(--btn-radius, 999px);
     padding:9px 16px;
     cursor:pointer;
   }
@@ -211,7 +223,7 @@
   .bubble{
     max-width:80%;
     padding:10px 14px;
-    border-radius:16px;
+    border-radius:var(--bubble-radius, 16px);
     font-size:14.5px;
     line-height:1.5;
     white-space:pre-wrap;
@@ -288,7 +300,7 @@
     color:var(--accent-fg);
     background:var(--accent);
     border:none;
-    border-radius:14px;
+    border-radius:var(--send-radius, 14px);
     padding:0 18px;
     cursor:pointer;
   }
@@ -318,10 +330,14 @@
     </div>
 
     <div class="chat-screen" id="chatScreen" hidden>
+      <div class="top-bar" id="topBar" hidden></div>
       <header>
-        <div class="brand">
-          <span class="name" id="brandName">Amverio</span>
-          <span class="tag" id="brandTag">AMVERIO DEMO</span>
+        <div class="brand-row">
+          <img class="brand-logo" id="brandLogo" alt="" hidden>
+          <div class="brand">
+            <span class="name" id="brandName">Amverio</span>
+            <span class="tag" id="brandTag">AMVERIO DEMO</span>
+          </div>
         </div>
         <div class="header-actions">
           <button class="switch-agent" id="switchAgentBtn" type="button">Switch agent</button>
@@ -354,6 +370,40 @@
   const switchAgentBtn = document.getElementById('switchAgentBtn');
   const brandNameEl = document.getElementById('brandName');
   const brandTagEl = document.getElementById('brandTag');
+  const brandLogoEl = document.getElementById('brandLogo');
+  const topBarEl = document.getElementById('topBar');
+  const rootEl = document.documentElement;
+  let appliedVars = [];
+
+  // Per-agent branding (e.g. JMG Cargo's own colours/logo). Inline vars on
+  // <html> override the default palette; clearTheme() puts it back.
+  function applyTheme(theme){
+    clearTheme();
+    if (!theme) return;
+    Object.entries(theme.vars || {}).forEach(function(kv){
+      rootEl.style.setProperty(kv[0], kv[1]);
+      appliedVars.push(kv[0]);
+    });
+    if (theme.color_scheme) rootEl.setAttribute('data-theme', theme.color_scheme);
+    if (theme.logo_url){
+      brandLogoEl.src = theme.logo_url;
+      brandLogoEl.alt = '';
+      brandLogoEl.hidden = false;
+    }
+    if (theme.top_bar){
+      topBarEl.textContent = theme.top_bar;
+      topBarEl.hidden = false;
+    }
+  }
+
+  function clearTheme(){
+    appliedVars.forEach(function(v){ rootEl.style.removeProperty(v); });
+    appliedVars = [];
+    rootEl.removeAttribute('data-theme');
+    brandLogoEl.hidden = true;
+    brandLogoEl.removeAttribute('src');
+    topBarEl.hidden = true;
+  }
 
   let threadId = null;
   let sending = false;
@@ -447,6 +497,7 @@
     brandTagEl.textContent = cfg.brand_tag;
     newOrderBtn.textContent = cfg.new_conversation_label;
     inputEl.placeholder = cfg.input_placeholder;
+    applyTheme(cfg.theme);
 
     pickerEl.hidden = true;
     chatScreenEl.hidden = false;
@@ -456,6 +507,7 @@
   }
 
   function backToPicker(){
+    clearTheme();
     chatScreenEl.hidden = true;
     pickerEl.hidden = false;
     threadId = null;
