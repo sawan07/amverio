@@ -55,6 +55,8 @@
     color-scheme: dark;
   }
   *{box-sizing:border-box}
+  /* .picker/.chat-screen set display:flex, which would otherwise beat the hidden attribute */
+  [hidden]{display:none !important}
   html,body{height:100%}
   body{
     margin:0;
@@ -396,16 +398,29 @@
       const data = await resp.json();
       domainsById = {};
       (data.domains || []).forEach(function(d){ domainsById[d.id] = d; });
+      const dedicated = pagePath && Object.values(domainsById).find(function(d){ return d.path === pagePath; });
+      if (dedicated){
+        dedicatedDomainId = dedicated.id;
+        switchAgentBtn.hidden = true;
+        selectDomain(dedicated.id);
+        return;
+      }
       renderDomainCards();
     } catch (e) {
+      pickerEl.hidden = false;
       pickerStatusEl.hidden = false;
       pickerStatusEl.textContent = "Couldn't load the available agents. Please refresh.";
     }
   }
 
+  // A dedicated page like /jmgcargo opens straight into that agent.
+  const pagePath = location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+  let dedicatedDomainId = null;
+  if (pagePath) pickerEl.hidden = true;  // avoid flashing the picker first
+
   function renderDomainCards(){
     domainCardsEl.innerHTML = '';
-    Object.values(domainsById).forEach(function(d){
+    Object.values(domainsById).filter(function(d){ return d.listed !== false; }).forEach(function(d){
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'domain-card';
@@ -427,7 +442,7 @@
     const cfg = domainsById[domainId];
     if (!cfg) return;
 
-    document.title = cfg.brand_name + ' — Amverio Demo';
+    document.title = dedicatedDomainId ? cfg.brand_name + ' — Instant Quote' : cfg.brand_name + ' — Amverio Demo';
     brandNameEl.textContent = cfg.brand_name;
     brandTagEl.textContent = cfg.brand_tag;
     newOrderBtn.textContent = cfg.new_conversation_label;

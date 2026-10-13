@@ -1,6 +1,6 @@
 # Amverio — Agent Prototype
 
-Text-chat prototype for Amverio. The same agent core runs **two verticals
+Text-chat prototype for Amverio. The same agent core runs **three verticals
 off one codebase**:
 
 - **restaurant** — "The Copper Fork": books a table, or takes a food order
@@ -8,6 +8,11 @@ off one codebase**:
 - **fundraising** — "Bright Horizons Trust": lists campaigns/causes and
   takes a donation (amount, cause, one-off/monthly, Gift Aid, dedication,
   anonymity).
+- **jmgcargo** — "JMG Cargo" (real client, jmgcargo.com): gives cargo
+  quotations for UK → Bangladesh / Asia / Europe / worldwide and sends the
+  quote request to the JMG team. Lives on its own page at
+  **`/jmgcargo`** (e.g. `amverio.prologicsw.com/jmgcargo`) and is hidden from
+  the shared demo picker at `/`.
 
 No real backend and no real payment on either vertical yet — by design,
 per the agreed "logic first" build order.
@@ -170,6 +175,34 @@ and the fundraising thread to "book a table" were both correctly declined
 by the agent as outside what it can do -- proving a thread's domain
 binding can't leak or be confused between agents even when two
 conversations are interleaved on the same running server.
+
+## JMG Cargo (quotation bot)
+
+Files: `jmgcargo_data.py` (company details, published rates, prohibited
+items -- all taken from jmgcargo.com on 2026-10-13), `jmgcargo_tools.py`
+(`get_service_info`, `check_items`, `estimate_quote`,
+`submit_quote_request`), `jmgcargo_system_prompt.md`,
+`test_jmgcargo_conversation.py`.
+
+How a quote works: the agent collects destination, parcels/weight (or box
+dimensions), contents, and collection vs drop-off; `check_items` flags
+prohibited contents (whole-word keyword match against JMG's Illegal Items
+page); `estimate_quote` computes "from £X" = chargeable kg x published
+"from" rate (Bangladesh/Asia/Worldwide £6, Europe £3.50).
+`submit_quote_request` validates name/email/phone/postcode, recalculates
+the estimate server-side (never trusts the model's number) and records the
+request with a `JMG-Q0001`-style reference.
+
+Domains can now declare `"path"` (a dedicated page at `/<path>` that opens
+straight into that agent, no picker or "Switch agent") and `"listed"`
+(whether it appears on the picker at `/`).
+
+**Confirm with JMG before going live** (marked `ASSUMPTION` in
+`jmgcargo_data.py`): rounding up to the next whole kg, volumetric divisor
+5000, and the real collection / insurance / express charges (the bot
+currently says "the team will confirm" for these). Quote requests are only
+held in memory -- they need emailing to info@jmgcargo.com (or a CRM)
+before real customers use it.
 
 ## Known simplifications (intentional, for this stage)
 

@@ -26,6 +26,7 @@ import logging
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from openai import OpenAI
@@ -220,6 +221,19 @@ def chat(req: ChatRequest):
         messages[:] = [messages[0]] + messages[-(MAX_TURNS_PER_THREAD - 1):]
 
     return ChatResponse(thread_id=req.thread_id, reply=reply)
+
+
+# Dedicated per-client pages, e.g. /jmgcargo -- the same index.html, which
+# reads its own path and opens straight into that agent (no picker, no
+# "Switch agent"). Registered explicitly per known path, so unknown paths
+# still fall through to the static mount below.
+def _dedicated_page():
+    return FileResponse(os.path.join(_here, "static", "index.html"))
+
+
+for _path in domain.domain_paths():
+    app.add_api_route(f"/{_path}", _dedicated_page, methods=["GET"], include_in_schema=False)
+    app.add_api_route(f"/{_path}/", _dedicated_page, methods=["GET"], include_in_schema=False)
 
 
 # Serve the chat UI. Keep this mounted last so /api/* above takes priority.

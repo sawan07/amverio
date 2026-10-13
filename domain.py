@@ -14,6 +14,10 @@ get_domain() below -- see chat.py.
 
     get_domain("restaurant")    -- The Copper Fork: table booking + food ordering.
     get_domain("fundraising")   -- Bright Horizons Trust: campaign donations.
+    get_domain("jmgcargo")      -- JMG Cargo: cargo/courier quotations. Real
+                                   client, so it lives on its own URL
+                                   (/jmgcargo) and is NOT shown on the
+                                   shared demo picker -- see "path"/"listed".
 
 Adding a third vertical later means adding one _load_* function and one
 line in _LOADERS -- nothing else (app.py, chat.py, the frontend) needs to
@@ -70,10 +74,38 @@ def _load_fundraising() -> dict:
     }
 
 
+def _load_jmgcargo() -> dict:
+    from jmgcargo_tools import TOOL_SCHEMAS, TOOL_FUNCTIONS
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "jmgcargo_system_prompt.md")) as f:
+        system_prompt_base = f.read()
+
+    return {
+        "id": "jmgcargo",
+        "brand_name": "JMG Cargo",
+        "brand_tag": "INSTANT CARGO QUOTE",
+        "greeting": (
+            "Hi, welcome to JMG Cargo! I can give you a quick quote for "
+            "sending parcels from the UK — where would you like to send them?"
+        ),
+        "new_conversation_label": "New quote",
+        "input_placeholder": "e.g. 2 boxes, 30kg to Sylhet…",
+        # Served on its own page at /jmgcargo and hidden from the shared
+        # demo picker at /.
+        "path": "jmgcargo",
+        "listed": False,
+        "system_prompt_base": system_prompt_base,
+        "tool_schemas": TOOL_SCHEMAS,
+        "tool_functions": TOOL_FUNCTIONS,
+    }
+
+
 # Order here is the order domains appear in the frontend picker.
 _LOADERS = {
     "restaurant": _load_restaurant,
     "fundraising": _load_fundraising,
+    "jmgcargo": _load_jmgcargo,
 }
 
 DOMAIN_IDS = list(_LOADERS.keys())
@@ -106,7 +138,22 @@ def list_domains() -> list:
         "id", "brand_name", "brand_tag", "greeting",
         "new_conversation_label", "input_placeholder",
     )
-    return [
-        {field: get_domain(domain_id)[field] for field in public_fields}
-        for domain_id in DOMAIN_IDS
-    ]
+    out = []
+    for domain_id in DOMAIN_IDS:
+        cfg = get_domain(domain_id)
+        entry = {field: cfg[field] for field in public_fields}
+        # "path": a dedicated page (/<path>) that opens straight into this
+        # agent. "listed": whether it shows as a card on the picker at /.
+        entry["path"] = cfg.get("path")
+        entry["listed"] = cfg.get("listed", True)
+        out.append(entry)
+    return out
+
+
+def domain_paths() -> dict:
+    """{path: domain_id} for every domain that has its own dedicated page."""
+    return {
+        get_domain(d)["path"]: d
+        for d in DOMAIN_IDS
+        if get_domain(d).get("path")
+    }
