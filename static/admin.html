@@ -943,7 +943,7 @@
         <div class="kpi-card">
           <div class="kpi-label">Total Sales <span>💰</span></div>
           <div class="kpi-value" id="kpiSales">£0.00</div>
-          <div class="kpi-sub"><span class="tag">● Live</span> Stripe Sandbox + Cash</div>
+          <div class="kpi-sub"><span class="tag">● Live</span> Digital Payments + Cash</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Orders Processed <span>📦</span></div>
@@ -963,7 +963,7 @@
         <div class="kpi-card">
           <div class="kpi-label">Agent Engine <span>🤖</span></div>
           <div class="kpi-value" style="font-size:24px; color:#10b981;">Autonomous</div>
-          <div class="kpi-sub">GPT-4.1 • Brevo • Stripe Ready</div>
+          <div class="kpi-sub">Zero-Leak Backend Execution</div>
         </div>
       </div>
 
@@ -1365,13 +1365,12 @@
             </div>
           `).join('');
 
-          const isStripe = o.payment_link && o.payment_link.includes('stripe');
-          const stripeBtn = isStripe 
-            ? `<a href="${o.payment_link}" target="_blank" class="stripe-link-btn">Stripe Checkout ↗</a>` 
+          const paymentBtn = o.payment_link 
+            ? `<a href="${o.payment_link}" target="_blank" class="stripe-link-btn" style="background:linear-gradient(135deg, #0284c7, #2563eb);">Secure Checkout Link ↗</a>` 
             : `<span style="font-size:11px;color:var(--text-muted);">Payment: ${escapeHtml(o.payment || 'Standard')}</span>`;
 
           const emailBadge = o.email_sent_to 
-            ? `<span style="font-size:11px;color:#10b981;">✉️ Brevo SMTP: Sent to ${escapeHtml(o.email_sent_to)}</span>`
+            ? `<span style="font-size:11px;color:#10b981;">✉️ Digital Receipt: Sent to ${escapeHtml(o.email_sent_to)}</span>`
             : '';
 
           return `
@@ -1408,7 +1407,7 @@
 
               <div class="order-bottom">
                 <div style="display:flex; align-items:center; gap: 14px;">
-                  ${stripeBtn}
+                  ${paymentBtn}
                   ${emailBadge}
                 </div>
                 <div style="display:flex; align-items:baseline; gap: 6px;">
