@@ -341,8 +341,8 @@ def admin_orders(_token: str = Depends(_require_admin)):
     return {"orders": db.get_orders()}
 
 
-@app.get("/order-success")
-@app.get("/order-success/")
+@app.api_route("/order-success", methods=["GET", "HEAD"])
+@app.api_route("/order-success/", methods=["GET", "HEAD"])
 def order_success_page(request: Request, order_id: Optional[str] = None, session_id: Optional[str] = None):
     """Callback landing page when customer finishes Stripe checkout."""
     if order_id:
