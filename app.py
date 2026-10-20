@@ -47,6 +47,7 @@ from openai import OpenAI
 
 import domain
 import data
+import db
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("amverio")
@@ -307,8 +308,8 @@ def admin_check_auth(token: str = Depends(_require_admin)):
 
 @app.get("/api/admin/overview")
 def admin_overview(_token: str = Depends(_require_admin)):
-    orders = data.ORDERS
-    reservations = data.RESERVATIONS
+    orders = db.get_orders()
+    reservations = db.get_reservations()
     total_sales = sum(float(o.get("total", 0)) for o in orders)
     orders_count = len(orders)
     avg_order_value = round(total_sales / orders_count, 2) if orders_count else 0.0
@@ -330,36 +331,34 @@ def admin_overview(_token: str = Depends(_require_admin)):
             "currency_symbol": "£",
             "active_threads": len(THREADS),
         },
-        "recent_orders": list(reversed(orders[-8:])),
-        "recent_reservations": list(reversed(reservations[-8:])),
+        "recent_orders": orders[:8],
+        "recent_reservations": reservations[:8],
     }
 
 
 @app.get("/api/admin/orders")
 def admin_orders(_token: str = Depends(_require_admin)):
-    return {"orders": list(reversed(data.ORDERS))}
+    return {"orders": db.get_orders()}
 
 
 @app.post("/api/admin/orders/{order_id}/status")
 def admin_update_order_status(order_id: str, req: OrderStatusUpdate, _token: str = Depends(_require_admin)):
-    for order in data.ORDERS:
-        if order.get("id") == order_id:
-            order["status"] = req.status.strip().upper()
-            return {"ok": True, "order": order}
+    order = db.update_order_status(order_id, req.status)
+    if order:
+        return {"ok": True, "order": order}
     raise HTTPException(status_code=404, detail=f"Order {order_id} not found.")
 
 
 @app.get("/api/admin/reservations")
 def admin_reservations(_token: str = Depends(_require_admin)):
-    return {"reservations": list(reversed(data.RESERVATIONS))}
+    return {"reservations": db.get_reservations()}
 
 
 @app.post("/api/admin/reservations/{res_id}/status")
 def admin_update_reservation_status(res_id: str, req: ReservationStatusUpdate, _token: str = Depends(_require_admin)):
-    for res in data.RESERVATIONS:
-        if res.get("id") == res_id:
-            res["status"] = req.status.strip().upper()
-            return {"ok": True, "reservation": res}
+    res = db.update_reservation_status(res_id, req.status)
+    if res:
+        return {"ok": True, "reservation": res}
     raise HTTPException(status_code=404, detail=f"Reservation {res_id} not found.")
 
 

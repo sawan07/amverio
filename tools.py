@@ -21,9 +21,10 @@ from email.utils import formataddr
 from datetime import datetime, timedelta
 from data import (
     BUSINESS, TABLES, MENU, MENU_BY_ID,
-    RESERVATIONS, ORDERS, DEFAULT_SEATING_MINUTES,
+    DEFAULT_SEATING_MINUTES,
     next_reservation_id, next_order_id,
 )
+import db
 
 # Load .env file if present
 _env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -78,7 +79,7 @@ def _is_valid_uk_phone(phone: str) -> bool:
 
 
 def _table_is_free(table_id: str, start: datetime, end: datetime) -> bool:
-    for r in RESERVATIONS:
+    for r in db.get_reservations():
         if r["table_id"] != table_id or r["status"] != "CONFIRMED":
             continue
         r_start = _parse_dt(r["date"], r["time"])
@@ -169,15 +170,14 @@ def book_table(date: str, time: str, party_size: int, customer_name: str, custom
         "status": "CONFIRMED",
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
-    RESERVATIONS.append(reservation)
+    db.add_reservation(reservation)
     return {"success": True, "reservation_id": reservation["id"], **reservation}
 
 
 def cancel_reservation(reservation_id: str) -> dict:
-    for r in RESERVATIONS:
-        if r["id"] == reservation_id and r["status"] == "CONFIRMED":
-            r["status"] = "CANCELLED"
-            return {"success": True, "reservation_id": reservation_id}
+    updated = db.update_reservation_status(reservation_id, "CANCELLED")
+    if updated:
+        return {"success": True, "reservation_id": reservation_id}
     return {"success": False, "reason": "Reservation not found or already cancelled."}
 
 
@@ -473,7 +473,7 @@ def place_order(
         "email_status": "sent" if email_result.get("sent") else ("simulated" if email_result.get("simulated") else "failed"),
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
-    ORDERS.append(order)
+    db.add_order(order)
     return {
         "success": True,
         "order_id": order["id"],

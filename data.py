@@ -88,116 +88,32 @@ MENU = [
 MENU_BY_ID = {item["id"]: item for item in MENU}
 
 # ---------------------------------------------------------------------------
-# In-memory state -- reset any time by restarting the process. Swapped for
-# real persistence (and real endpoints) once this graduates out of prototype.
+# Persistent state -- backed by db.py (PostgreSQL / SQLite)
 # ---------------------------------------------------------------------------
 
-from datetime import datetime, time, timedelta
-import itertools
-
-_reservation_ids = itertools.count(4)
-_order_ids = itertools.count(4)
-
-RESERVATIONS = [
-    {
-        "id": "R0001",
-        "table_id": "T4",
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "time": "19:00",
-        "party_size": 4,
-        "name": "Sarah Jenkins",
-        "phone": "+44 7700 900123",
-        "status": "CONFIRMED",
-        "created_at": "Today 14:15",
-    },
-    {
-        "id": "R0002",
-        "table_id": "T1",
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "time": "20:30",
-        "party_size": 2,
-        "name": "David Miller",
-        "phone": "+44 7700 900456",
-        "status": "CONFIRMED",
-        "created_at": "Today 15:40",
-    },
-    {
-        "id": "R0003",
-        "table_id": "T6",
-        "date": (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"),
-        "time": "18:30",
-        "party_size": 6,
-        "name": "Emma Watson",
-        "phone": "+44 7700 900789",
-        "status": "CONFIRMED",
-        "created_at": "Today 16:20",
-    },
-]
-
-ORDERS = [
-    {
-        "id": "O0001",
-        "items": [
-            {"menu_id": "M2", "name": "8oz Sirloin Steak", "quantity": 2, "unit_price": 19.00, "line_total": 38.00},
-            {"menu_id": "D1", "name": "Skin-On Fries", "quantity": 2, "unit_price": 4.00, "line_total": 8.00},
-            {"menu_id": "P1", "name": "Sticky Toffee Pudding", "quantity": 2, "unit_price": 6.00, "line_total": 12.00},
-        ],
-        "order_type": "delivery",
-        "name": "James Henderson",
-        "phone": "+44 7700 900321",
-        "email": "james.h@example.co.uk",
-        "status": "PAID",
-        "total": 58.00,
-        "payment": "Stripe Sandbox",
-        "payment_link": "https://checkout.stripe.com/demo/o0001",
-        "email_sent_to": "james.h@example.co.uk",
-        "email_status": "sent",
-        "created_at": "Today 18:25",
-    },
-    {
-        "id": "O0002",
-        "items": [
-            {"menu_id": "M1", "name": "Chargrilled Chicken Burger", "quantity": 1, "unit_price": 13.50, "line_total": 13.50},
-            {"menu_id": "M4", "name": "Beer-Battered Fish & Chips", "quantity": 1, "unit_price": 14.00, "line_total": 14.00},
-            {"menu_id": "S2", "name": "Garlic Flatbread", "quantity": 1, "unit_price": 5.50, "line_total": 5.50},
-        ],
-        "order_type": "collection",
-        "name": "Oliver Twist",
-        "phone": "+44 7700 900654",
-        "email": "oliver@example.co.uk",
-        "status": "PREPARING",
-        "total": 33.00,
-        "payment": "Stripe Sandbox",
-        "payment_link": "https://checkout.stripe.com/demo/o0002",
-        "email_sent_to": "oliver@example.co.uk",
-        "email_status": "sent",
-        "created_at": "Today 19:10",
-    },
-    {
-        "id": "O0003",
-        "items": [
-            {"menu_id": "M3", "name": "Wild Mushroom Risotto", "quantity": 1, "unit_price": 12.50, "line_total": 12.50},
-            {"menu_id": "S1", "name": "Soup of the Day", "quantity": 1, "unit_price": 6.50, "line_total": 6.50},
-            {"menu_id": "P2", "name": "Chocolate Brownie", "quantity": 1, "unit_price": 6.00, "line_total": 6.00},
-        ],
-        "order_type": "collection",
-        "name": "Charlotte Bronte",
-        "phone": "+44 7700 900987",
-        "email": "charlotte@example.co.uk",
-        "status": "RECEIVED",
-        "total": 25.00,
-        "payment": "Stripe Sandbox",
-        "payment_link": "https://checkout.stripe.com/demo/o0003",
-        "email_sent_to": "charlotte@example.co.uk",
-        "email_status": "sent",
-        "created_at": "Today 19:45",
-    },
-]
+import db
 
 
-def next_reservation_id():
-    return f"R{next(_reservation_ids):04d}"
+def get_orders() -> list[dict]:
+    return db.get_orders()
 
 
-def next_order_id():
-    return f"O{next(_order_ids):04d}"
+def get_reservations() -> list[dict]:
+    return db.get_reservations()
+
+
+def next_reservation_id() -> str:
+    return db.get_next_reservation_id()
+
+
+def next_order_id() -> str:
+    return db.get_next_order_id()
+
+
+def __getattr__(name: str):
+    if name == "ORDERS":
+        return db.get_orders()
+    if name == "RESERVATIONS":
+        return db.get_reservations()
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
