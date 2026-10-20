@@ -167,6 +167,7 @@ def book_table(date: str, time: str, party_size: int, customer_name: str, custom
         "name": customer_name,
         "phone": customer_phone,
         "status": "CONFIRMED",
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
     RESERVATIONS.append(reservation)
     return {"success": True, "reservation_id": reservation["id"], **reservation}
@@ -470,6 +471,7 @@ def place_order(
         "payment_link": payment_link,
         "email_sent_to": customer_email,
         "email_status": "sent" if email_result.get("sent") else ("simulated" if email_result.get("simulated") else "failed"),
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
     ORDERS.append(order)
     return {

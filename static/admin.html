@@ -1,0 +1,1608 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Amverio Client Portal — The Copper Fork Admin</title>
+  <meta name="description" content="Real-time sales, live order tracking, and table reservations for Amverio autonomous restaurant agent.">
+  <link rel="icon" type="image/svg+xml" href="/static/amverio-icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('amverio_theme');
+        var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch(e) {}
+    })();
+  </script>
+
+  <style>
+    :root {
+      --bg-deep: #050811;
+      --bg-card: rgba(13, 21, 38, 0.72);
+      --bg-card-hover: rgba(18, 30, 54, 0.85);
+      --card-border: rgba(0, 242, 254, 0.14);
+      --card-border-hover: rgba(0, 242, 254, 0.42);
+
+      --cyan-bright: #00f2fe;
+      --cyan-electric: #00c3ff;
+      --blue-accent: #0066ff;
+      --blue-deep: #003399;
+      --blue-glow: rgba(0, 242, 254, 0.28);
+
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-sub: #64748b;
+
+      --header-bg: rgba(5, 8, 17, 0.85);
+      --header-border: rgba(0, 242, 254, 0.16);
+      --grid-line: rgba(0, 242, 254, 0.04);
+
+      --status-received: #f59e0b;
+      --status-preparing: #0284c7;
+      --status-ready: #10b981;
+      --status-completed: #64748b;
+      --status-paid: #10b981;
+      --status-cancelled: #ef4444;
+
+      --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    [data-theme="light"] {
+      --bg-deep: #f8fafc;
+      --bg-card: rgba(255, 255, 255, 0.88);
+      --bg-card-hover: rgba(255, 255, 255, 0.98);
+      --card-border: rgba(2, 132, 199, 0.18);
+      --card-border-hover: rgba(2, 132, 199, 0.5);
+
+      --cyan-bright: #0284c7;
+      --cyan-electric: #0369a1;
+      --blue-accent: #2563eb;
+      --blue-deep: #e0f2fe;
+      --blue-glow: rgba(2, 132, 199, 0.22);
+
+      --text-main: #091322;
+      --text-muted: #475569;
+      --text-sub: #64748b;
+
+      --header-bg: rgba(255, 255, 255, 0.9);
+      --header-border: rgba(2, 132, 199, 0.16);
+      --grid-line: rgba(2, 132, 199, 0.05);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      background-color: var(--bg-deep);
+      color: var(--text-main);
+      font-family: var(--font-body);
+    }
+
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at 50% 0%, rgba(0, 102, 255, 0.14) 0%, rgba(5, 8, 17, 1) 60%),
+                  radial-gradient(circle at 90% 20%, rgba(0, 242, 254, 0.08) 0%, transparent 45%),
+                  var(--bg-deep);
+      background-attachment: fixed;
+      line-height: 1.5;
+      transition: background 0.3s ease, color 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    [data-theme="light"] body {
+      background: radial-gradient(circle at 50% 0%, rgba(2, 132, 199, 0.12) 0%, rgba(248, 250, 252, 1) 60%),
+                  radial-gradient(circle at 90% 20%, rgba(37, 99, 235, 0.08) 0%, transparent 45%),
+                  var(--bg-deep);
+    }
+
+    .cyber-grid {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: 
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app-wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+      flex: 1;
+    }
+
+    /* ---- Navbar ---- */
+    header.site-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--header-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--header-border);
+      padding: 14px 0;
+      margin-bottom: 24px;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+    }
+
+    .brand-logo-img {
+      height: 38px;
+      width: auto;
+      display: block;
+    }
+
+    .brand-badge {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: rgba(0, 242, 254, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--cyan-bright);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulseDot 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ctrl-btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 9999px;
+      border: 1px solid var(--card-border);
+      background: var(--bg-card);
+      color: var(--text-main);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .ctrl-btn:hover {
+      border-color: var(--cyan-bright);
+      box-shadow: 0 0 12px var(--blue-glow);
+      transform: translateY(-1px);
+    }
+
+    .ctrl-btn.primary {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #ffffff;
+      border: none;
+    }
+
+    .theme-toggle {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ---- Tab Navigation ---- */
+    .tab-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 12px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .tab-btn {
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 9999px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(0, 242, 254, 0.05);
+    }
+
+    .tab-btn.active {
+      color: #ffffff;
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      box-shadow: 0 2px 14px var(--blue-glow);
+    }
+
+    [data-theme="light"] .tab-btn.active {
+      color: #ffffff;
+    }
+
+    .tab-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .tab-btn.active .tab-badge {
+      background: rgba(255, 255, 255, 0.25);
+      color: #fff;
+    }
+
+    /* ---- KPI Grid ---- */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card:hover {
+      border-color: var(--card-border-hover);
+      box-shadow: 0 4px 20px var(--blue-glow);
+      transform: translateY(-2px);
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--cyan-bright), var(--blue-accent));
+      opacity: 0.8;
+    }
+
+    .kpi-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kpi-value {
+      font-family: var(--font-mono);
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--text-sub);
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kpi-sub .tag {
+      color: #10b981;
+      font-weight: 600;
+    }
+
+    /* ---- Content Panes ---- */
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---- Two-Column Overview Layout ---- */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .overview-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel-card {
+      background: var(--bg-card);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ---- Order & Reservation Cards / Tables ---- */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .filter-chips {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .filter-chip {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--card-border);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .filter-chip.active, .filter-chip:hover {
+      border-color: var(--cyan-bright);
+      color: var(--text-main);
+      background: rgba(0, 242, 254, 0.1);
+    }
+
+    .search-input {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 7px 14px;
+      border-radius: 9999px;
+      border: 1px solid var(--card-border);
+      background: var(--bg-card);
+      color: var(--text-main);
+      outline: none;
+      width: 220px;
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--cyan-bright);
+      box-shadow: 0 0 10px var(--blue-glow);
+    }
+
+    /* Orders List */
+    .orders-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .order-card {
+      background: var(--bg-card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 18px;
+      transition: all 0.2s ease;
+    }
+
+    .order-card:hover {
+      border-color: var(--card-border-hover);
+      box-shadow: 0 4px 16px var(--blue-glow);
+    }
+
+    .order-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    [data-theme="light"] .order-top {
+      border-bottom-color: rgba(0, 0, 0, 0.06);
+    }
+
+    .order-id-tag {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--cyan-bright);
+    }
+
+    .order-badge-type {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(2, 132, 199, 0.15);
+      color: var(--cyan-electric);
+      border: 1px solid rgba(2, 132, 199, 0.25);
+    }
+
+    .status-select {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      border: 1px solid transparent;
+      outline: none;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s ease;
+    }
+
+    .status-RECEIVED { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
+    .status-PREPARING { background: rgba(2, 132, 199, 0.15); color: #0284c7; border-color: rgba(2, 132, 199, 0.4); }
+    .status-READY { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
+    .status-COMPLETED { background: rgba(100, 116, 139, 0.15); color: #94a3b8; border-color: rgba(100, 116, 139, 0.4); }
+    .status-PAID { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
+    .status-CANCELLED { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
+
+    .order-middle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    @media (max-width: 640px) {
+      .order-middle {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .order-customer {
+      font-size: 13px;
+    }
+
+    .order-customer-name {
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .order-customer-contact {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .order-items-box {
+      font-size: 13px;
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 10px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    [data-theme="light"] .order-items-box {
+      background: rgba(0, 0, 0, 0.03);
+      border-color: rgba(0, 0, 0, 0.06);
+    }
+
+    .order-item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 0;
+      color: var(--text-main);
+    }
+
+    .order-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .order-total-price {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .stripe-link-btn {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #635bff;
+      color: #ffffff;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: opacity 0.2s;
+    }
+
+    .stripe-link-btn:hover {
+      opacity: 0.9;
+    }
+
+    /* Table Reservations List */
+    .reservations-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .reservations-table th {
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .reservations-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+    }
+
+    [data-theme="light"] .reservations-table td {
+      border-bottom-color: rgba(0, 0, 0, 0.06);
+    }
+
+    .reservations-table tr:hover td {
+      background: rgba(0, 242, 254, 0.04);
+    }
+
+    /* Menu & Tables Grid */
+    .menu-cat-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--cyan-bright);
+      margin: 20px 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+
+    .menu-item-card {
+      background: var(--bg-card);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .menu-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+
+    .menu-item-name {
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .menu-item-price {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--cyan-bright);
+    }
+
+    .menu-item-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .dietary-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      margin-left: 4px;
+    }
+
+    /* ---- Login Modal / Overlay ---- */
+    .login-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(5, 8, 17, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    [data-theme="light"] .login-overlay {
+      background: rgba(248, 250, 252, 0.88);
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-card);
+      border: 1px solid var(--card-border-hover);
+      border-radius: 24px;
+      padding: 36px 30px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px var(--blue-glow);
+      text-align: center;
+      animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalPop {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .login-logo {
+      height: 48px;
+      margin: 0 auto 16px;
+      display: block;
+    }
+
+    .login-title {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .login-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 22px;
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-group input {
+      width: 100%;
+      font-family: inherit;
+      font-size: 14px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      background: var(--bg-deep);
+      color: var(--text-main);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .form-group input:focus {
+      border-color: var(--cyan-bright);
+      box-shadow: 0 0 12px var(--blue-glow);
+    }
+
+    .demo-hint-box {
+      background: rgba(0, 242, 254, 0.07);
+      border: 1px dashed var(--card-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+    }
+
+    .fill-btn {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--cyan-bright);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .login-btn {
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 12px;
+      border-radius: 9999px;
+      border: none;
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 4px 16px var(--blue-glow);
+      transition: all 0.2s ease;
+      margin-top: 8px;
+    }
+
+    .login-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 22px var(--blue-glow);
+    }
+
+    .login-error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #ef4444;
+      font-size: 13px;
+      padding: 10px;
+      border-radius: 10px;
+      display: none;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    /* ---- Toast Notification ---- */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast {
+      pointer-events: auto;
+      background: var(--bg-card);
+      border: 1px solid var(--card-border-hover);
+      color: var(--text-main);
+      padding: 12px 18px;
+      border-radius: 14px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: toastIn 0.3s ease-out;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .spin {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="cyber-grid"></div>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="app-wrapper" style="padding-bottom: 0;">
+      <div class="header-inner">
+        <a href="/" class="brand-group">
+          <img src="/static/amverio-logo.svg" alt="Amverio Logo" class="brand-logo-img">
+          <div class="brand-badge">
+            <span class="live-dot"></span>
+            The Copper Fork Admin
+          </div>
+        </a>
+
+        <div class="header-controls">
+          <button id="refreshBtn" class="ctrl-btn" title="Refresh Live Data">
+            <span id="refreshIcon">🔄</span> Refresh
+          </button>
+          <a href="/restaurant" target="_blank" class="ctrl-btn primary" title="Open Customer AI Chat">
+            Test AI Chat ↗
+          </a>
+          <button id="themeToggleBtn" class="ctrl-btn theme-toggle" title="Toggle theme">
+            🌓
+          </button>
+          <button id="logoutBtn" class="ctrl-btn" title="Log out" style="display:none;">
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main App View -->
+  <main class="app-wrapper" id="adminApp" style="display:none;">
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="overview">
+        📊 Overview
+      </button>
+      <button class="tab-btn" data-tab="orders">
+        🧾 Orders & Sales <span class="tab-badge" id="ordersBadge">0</span>
+      </button>
+      <button class="tab-btn" data-tab="reservations">
+        📅 Table Bookings <span class="tab-badge" id="resBadge">0</span>
+      </button>
+      <button class="tab-btn" data-tab="menu">
+        📋 Menu & Tables
+      </button>
+    </nav>
+
+    <!-- TAB 1: OVERVIEW -->
+    <section class="tab-pane active" id="pane-overview">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Sales <span>💰</span></div>
+          <div class="kpi-value" id="kpiSales">£0.00</div>
+          <div class="kpi-sub"><span class="tag">● Live</span> Stripe Sandbox + Cash</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Orders Processed <span>📦</span></div>
+          <div class="kpi-value" id="kpiOrders">0</div>
+          <div class="kpi-sub" id="kpiOrderSub">All-time order count</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Table Reservations <span>🍽️</span></div>
+          <div class="kpi-value" id="kpiReservations">0</div>
+          <div class="kpi-sub" id="kpiResSub">Confirmed bookings</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Avg Order Value <span>📈</span></div>
+          <div class="kpi-value" id="kpiAov">£0.00</div>
+          <div class="kpi-sub">Revenue per order</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Agent Engine <span>🤖</span></div>
+          <div class="kpi-value" style="font-size:24px; color:#10b981;">Autonomous</div>
+          <div class="kpi-sub">GPT-4.1 • Brevo • Stripe Ready</div>
+        </div>
+      </div>
+
+      <div class="overview-grid">
+        <!-- Recent Orders Panel -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <h2 class="panel-title"><span>🧾</span> Recent Orders</h2>
+            <button class="ctrl-btn" onclick="switchTab('orders')">View All</button>
+          </div>
+          <div id="overviewRecentOrders" class="orders-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Upcoming Reservations Panel -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <h2 class="panel-title"><span>📅</span> Upcoming Bookings</h2>
+            <button class="ctrl-btn" onclick="switchTab('reservations')">View All</button>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="reservations-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Guest</th>
+                  <th>Table</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="overviewRecentReservations">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: ORDERS & SALES -->
+    <section class="tab-pane" id="pane-orders">
+      <div class="panel-card">
+        <div class="filter-bar">
+          <div class="filter-chips" id="orderFilterChips">
+            <button class="filter-chip active" data-filter="ALL">All Orders</button>
+            <button class="filter-chip" data-filter="RECEIVED">Received</button>
+            <button class="filter-chip" data-filter="PREPARING">Preparing</button>
+            <button class="filter-chip" data-filter="READY">Ready</button>
+            <button class="filter-chip" data-filter="PAID">Paid</button>
+            <button class="filter-chip" data-filter="COMPLETED">Completed</button>
+          </div>
+          <input type="text" id="orderSearchInput" class="search-input" placeholder="Search customer, phone, ID…">
+        </div>
+
+        <div id="fullOrdersList" class="orders-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: TABLE RESERVATIONS -->
+    <section class="tab-pane" id="pane-reservations">
+      <div class="panel-card">
+        <div class="filter-bar">
+          <div class="filter-chips" id="resFilterChips">
+            <button class="filter-chip active" data-filter="ALL">All Bookings</button>
+            <button class="filter-chip" data-filter="CONFIRMED">Confirmed</button>
+            <button class="filter-chip" data-filter="SEATED">Seated</button>
+            <button class="filter-chip" data-filter="COMPLETED">Completed</button>
+            <button class="filter-chip" data-filter="CANCELLED">Cancelled</button>
+          </div>
+          <input type="text" id="resSearchInput" class="search-input" placeholder="Search guest name, phone…">
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="reservations-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Date & Time</th>
+                <th>Guest Name</th>
+                <th>Contact</th>
+                <th>Party</th>
+                <th>Table</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="fullReservationsTable">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: MENU & TABLES -->
+    <section class="tab-pane" id="pane-menu">
+      <div class="panel-card" style="margin-bottom: 24px;">
+        <h2 class="panel-title" style="margin-bottom: 12px;"><span>🍽️</span> Active Restaurant Menu</h2>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Live menu catalog synced with Amverio conversational agent for orders, price inquiries, and dietary queries.
+        </p>
+        <div id="menuCategories">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <h2 class="panel-title" style="margin-bottom: 12px;"><span>🪑</span> Tables Layout & Availability</h2>
+        <div id="tablesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Login Modal Overlay -->
+  <div class="login-overlay" id="loginModal">
+    <div class="login-card">
+      <img src="/static/amverio-logo.svg" alt="Amverio" class="login-logo">
+      <h1 class="login-title">Client Admin Portal</h1>
+      <p class="login-desc">Sign in to monitor live sales, orders, and table bookings.</p>
+
+      <div class="login-error" id="loginErrorMsg"></div>
+
+      <form class="login-form" id="loginForm">
+        <div class="form-group">
+          <label for="loginUsername">Username</label>
+          <input type="text" id="loginUsername" required autocomplete="username" value="admin">
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" required autocomplete="current-password" value="amverio2026">
+        </div>
+
+        <div class="demo-hint-box">
+          <span>Demo Access: <strong>admin</strong> / <strong>amverio2026</strong></span>
+          <button type="button" class="fill-btn" id="fillDemoBtn">Auto-fill</button>
+        </div>
+
+        <button type="submit" class="login-btn" id="submitLoginBtn">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Client Admin Script -->
+  <script>
+    (function() {
+      let currentAdminToken = localStorage.getItem('amverio_admin_token') || '';
+      let ordersData = [];
+      let reservationsData = [];
+      let currentOrderFilter = 'ALL';
+      let currentResFilter = 'ALL';
+      let autoRefreshTimer = null;
+
+      const adminApp = document.getElementById('adminApp');
+      const loginModal = document.getElementById('loginModal');
+      const loginForm = document.getElementById('loginForm');
+      const loginErrorMsg = document.getElementById('loginErrorMsg');
+      const submitLoginBtn = document.getElementById('submitLoginBtn');
+      const fillDemoBtn = document.getElementById('fillDemoBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const refreshBtn = document.getElementById('refreshBtn');
+      const refreshIcon = document.getElementById('refreshIcon');
+      const themeToggleBtn = document.getElementById('themeToggleBtn');
+
+      // Toast utility
+      function showToast(message, type) {
+        const c = document.getElementById('toastContainer');
+        const t = document.createElement('div');
+        t.className = 'toast';
+        t.innerHTML = (type === 'error' ? '⚠️ ' : '✅ ') + message;
+        c.appendChild(t);
+        setTimeout(() => {
+          t.style.opacity = '0';
+          t.style.transform = 'translateY(10px)';
+          setTimeout(() => t.remove(), 300);
+        }, 3200);
+      }
+
+      // Theme toggle
+      function initTheme() {
+        themeToggleBtn.addEventListener('click', () => {
+          const root = document.documentElement;
+          const current = root.getAttribute('data-theme') || 'dark';
+          const next = current === 'dark' ? 'light' : 'dark';
+          root.setAttribute('data-theme', next);
+          localStorage.setItem('amverio_theme', next);
+        });
+      }
+
+      // Auth validation
+      async function checkAuth() {
+        try {
+          const res = await fetch('/api/admin/check-auth', {
+            headers: { 'Authorization': 'Bearer ' + currentAdminToken }
+          });
+          if (res.ok) {
+            loginModal.style.display = 'none';
+            adminApp.style.display = 'block';
+            logoutBtn.style.display = 'inline-flex';
+            loadAllData();
+            startAutoRefresh();
+            return true;
+          }
+        } catch (e) {}
+        loginModal.style.display = 'flex';
+        adminApp.style.display = 'none';
+        logoutBtn.style.display = 'none';
+        stopAutoRefresh();
+        return false;
+      }
+
+      // Fill demo button
+      fillDemoBtn.addEventListener('click', () => {
+        document.getElementById('loginUsername').value = 'admin';
+        document.getElementById('loginPassword').value = 'amverio2026';
+      });
+
+      // Login form submit
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        loginErrorMsg.style.display = 'none';
+        submitLoginBtn.disabled = true;
+        submitLoginBtn.textContent = 'Authenticating…';
+
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value.trim();
+
+        try {
+          const res = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+          });
+          const data = await res.json();
+          if (res.ok && data.token) {
+            currentAdminToken = data.token;
+            localStorage.setItem('amverio_admin_token', data.token);
+            loginModal.style.display = 'none';
+            adminApp.style.display = 'block';
+            logoutBtn.style.display = 'inline-flex';
+            showToast('Welcome to Amverio Client Portal', 'success');
+            loadAllData();
+            startAutoRefresh();
+          } else {
+            loginErrorMsg.textContent = data.detail || 'Invalid username or password.';
+            loginErrorMsg.style.display = 'block';
+          }
+        } catch (err) {
+          loginErrorMsg.textContent = 'Connection error. Please try again.';
+          loginErrorMsg.style.display = 'block';
+        } finally {
+          submitLoginBtn.disabled = false;
+          submitLoginBtn.textContent = 'Sign In';
+        }
+      });
+
+      // Logout
+      logoutBtn.addEventListener('click', async () => {
+        try {
+          await fetch('/api/admin/logout', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + currentAdminToken }
+          });
+        } catch(e) {}
+        currentAdminToken = '';
+        localStorage.removeItem('amverio_admin_token');
+        checkAuth();
+      });
+
+      // Tab Switching
+      window.switchTab = function(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.toggle('active', b.getAttribute('data-tab') === tabName);
+        });
+        document.querySelectorAll('.tab-pane').forEach(p => {
+          p.classList.toggle('active', p.id === 'pane-' + tabName);
+        });
+      };
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+      });
+
+      // Load Data
+      async function loadAllData() {
+        refreshIcon.classList.add('spin');
+        try {
+          const [overviewRes, ordersRes, resRes, menuRes] = await Promise.all([
+            fetch('/api/admin/overview', { headers: { 'Authorization': 'Bearer ' + currentAdminToken } }),
+            fetch('/api/admin/orders', { headers: { 'Authorization': 'Bearer ' + currentAdminToken } }),
+            fetch('/api/admin/reservations', { headers: { 'Authorization': 'Bearer ' + currentAdminToken } }),
+            fetch('/api/admin/menu', { headers: { 'Authorization': 'Bearer ' + currentAdminToken } }),
+          ]);
+
+          if (overviewRes.status === 401 || ordersRes.status === 401) {
+            checkAuth();
+            return;
+          }
+
+          const overview = await overviewRes.json();
+          const orders = await ordersRes.json();
+          const reservations = await resRes.json();
+          const menuData = await menuRes.json();
+
+          ordersData = orders.orders || [];
+          reservationsData = reservations.reservations || [];
+
+          renderOverview(overview);
+          renderOrders();
+          renderReservations();
+          renderMenu(menuData);
+        } catch (e) {
+          console.error("Error loading data:", e);
+        } finally {
+          refreshIcon.classList.remove('spin');
+        }
+      }
+
+      function renderOverview(data) {
+        const s = data.stats || {};
+        document.getElementById('kpiSales').textContent = '£' + (s.total_sales || 0).toFixed(2);
+        document.getElementById('kpiOrders').textContent = s.orders_count || 0;
+        document.getElementById('kpiReservations').textContent = s.reservations_count || 0;
+        document.getElementById('kpiAov').textContent = '£' + (s.avg_order_value || 0).toFixed(2);
+        document.getElementById('ordersBadge').textContent = s.orders_count || 0;
+        document.getElementById('resBadge').textContent = s.reservations_count || 0;
+
+        // Recent orders snippet
+        const recentOrdersContainer = document.getElementById('overviewRecentOrders');
+        const recent = data.recent_orders || [];
+        if (!recent.length) {
+          recentOrdersContainer.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">No recent orders recorded.</p>';
+        } else {
+          recentOrdersContainer.innerHTML = recent.slice(0, 4).map(o => `
+            <div class="order-card" style="padding: 12px;">
+              <div class="order-top" style="margin-bottom:6px; padding-bottom:6px;">
+                <span class="order-id-tag">#${o.id}</span>
+                <span class="status-select status-${o.status}">${o.status}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+                <div>
+                  <strong>${escapeHtml(o.name || 'Guest')}</strong>
+                  <div style="font-size:11px; color:var(--text-muted);">${(o.items||[]).length} item(s) • ${o.created_at || 'Recently'}</div>
+                </div>
+                <div class="order-total-price" style="font-size:16px;">£${(o.total || 0).toFixed(2)}</div>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        // Recent bookings snippet
+        const recentResContainer = document.getElementById('overviewRecentReservations');
+        const recentRes = data.recent_reservations || [];
+        if (!recentRes.length) {
+          recentResContainer.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted); text-align:center;">No upcoming bookings.</td></tr>';
+        } else {
+          recentResContainer.innerHTML = recentRes.slice(0, 5).map(r => `
+            <tr>
+              <td><strong>${r.time}</strong> <span style="font-size:11px;color:var(--text-muted);">(${r.date})</span></td>
+              <td>${escapeHtml(r.name || 'Guest')} <span style="font-size:11px;color:var(--text-muted);">(${r.party_size}p)</span></td>
+              <td><span style="font-family:var(--font-mono);font-weight:600;color:var(--cyan-bright);">${r.table_id}</span></td>
+              <td><span class="status-select status-${r.status}">${r.status}</span></td>
+            </tr>
+          `).join('');
+        }
+      }
+
+      function renderOrders() {
+        const container = document.getElementById('fullOrdersList');
+        const search = (document.getElementById('orderSearchInput').value || '').toLowerCase().trim();
+
+        const filtered = ordersData.filter(o => {
+          if (currentOrderFilter !== 'ALL' && o.status !== currentOrderFilter) return false;
+          if (search) {
+            const matchesId = (o.id || '').toLowerCase().includes(search);
+            const matchesName = (o.name || '').toLowerCase().includes(search);
+            const matchesPhone = (o.phone || '').toLowerCase().includes(search);
+            if (!matchesId && !matchesName && !matchesPhone) return false;
+          }
+          return true;
+        });
+
+        if (!filtered.length) {
+          container.innerHTML = '<div style="text-align:center; padding: 40px; color:var(--text-muted);">No orders match the current filter.</div>';
+          return;
+        }
+
+        container.innerHTML = filtered.map(o => {
+          const itemsList = (o.items || []).map(i => `
+            <div class="order-item-row">
+              <span>${i.quantity}x ${escapeHtml(i.name)}</span>
+              <span style="font-family:var(--font-mono);">£${((i.unit_price || 0) * i.quantity).toFixed(2)}</span>
+            </div>
+          `).join('');
+
+          const isStripe = o.payment_link && o.payment_link.includes('stripe');
+          const stripeBtn = isStripe 
+            ? `<a href="${o.payment_link}" target="_blank" class="stripe-link-btn">Stripe Checkout ↗</a>` 
+            : `<span style="font-size:11px;color:var(--text-muted);">Payment: ${escapeHtml(o.payment || 'Standard')}</span>`;
+
+          const emailBadge = o.email_sent_to 
+            ? `<span style="font-size:11px;color:#10b981;">✉️ Brevo SMTP: Sent to ${escapeHtml(o.email_sent_to)}</span>`
+            : '';
+
+          return `
+            <div class="order-card">
+              <div class="order-top">
+                <div style="display:flex; align-items:center; gap: 10px;">
+                  <span class="order-id-tag">#${o.id}</span>
+                  <span class="order-badge-type">${escapeHtml(o.order_type || 'Takeaway')}</span>
+                  <span style="font-size:12px; color:var(--text-muted);">${o.created_at || ''}</span>
+                </div>
+                <div>
+                  <select class="status-select status-${o.status}" onchange="updateOrderStatus('${o.id}', this.value)">
+                    <option value="RECEIVED" ${o.status==='RECEIVED'?'selected':''}>RECEIVED</option>
+                    <option value="PREPARING" ${o.status==='PREPARING'?'selected':''}>PREPARING</option>
+                    <option value="READY" ${o.status==='READY'?'selected':''}>READY</option>
+                    <option value="PAID" ${o.status==='PAID'?'selected':''}>PAID</option>
+                    <option value="COMPLETED" ${o.status==='COMPLETED'?'selected':''}>COMPLETED</option>
+                    <option value="CANCELLED" ${o.status==='CANCELLED'?'selected':''}>CANCELLED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="order-middle">
+                <div class="order-customer">
+                  <div class="order-customer-name">${escapeHtml(o.name || 'Guest Customer')}</div>
+                  <div class="order-customer-contact">📞 ${escapeHtml(o.phone || 'N/A')}</div>
+                  ${o.email ? `<div class="order-customer-contact">✉️ ${escapeHtml(o.email)}</div>` : ''}
+                </div>
+                <div class="order-items-box">
+                  <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;">Items Ordered</div>
+                  ${itemsList}
+                </div>
+              </div>
+
+              <div class="order-bottom">
+                <div style="display:flex; align-items:center; gap: 14px;">
+                  ${stripeBtn}
+                  ${emailBadge}
+                </div>
+                <div style="display:flex; align-items:baseline; gap: 6px;">
+                  <span style="font-size:12px; color:var(--text-muted);">Total:</span>
+                  <span class="order-total-price">£${(o.total || 0).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderReservations() {
+        const tbody = document.getElementById('fullReservationsTable');
+        const search = (document.getElementById('resSearchInput').value || '').toLowerCase().trim();
+
+        const filtered = reservationsData.filter(r => {
+          if (currentResFilter !== 'ALL' && r.status !== currentResFilter) return false;
+          if (search) {
+            const matchesId = (r.id || '').toLowerCase().includes(search);
+            const matchesName = (r.name || '').toLowerCase().includes(search);
+            const matchesPhone = (r.phone || '').toLowerCase().includes(search);
+            if (!matchesId && !matchesName && !matchesPhone) return false;
+          }
+          return true;
+        });
+
+        if (!filtered.length) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No reservations found matching this criteria.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = filtered.map(r => `
+          <tr>
+            <td style="font-family:var(--font-mono);font-weight:700;color:var(--cyan-bright);">#${r.id}</td>
+            <td><strong>${r.time}</strong> <div style="font-size:11px;color:var(--text-muted);">${r.date}</div></td>
+            <td><strong>${escapeHtml(r.name || 'Guest')}</strong></td>
+            <td>${escapeHtml(r.phone || 'N/A')}</td>
+            <td><span class="order-badge-type">${r.party_size} Guests</span></td>
+            <td><strong style="color:var(--cyan-bright);">${r.table_id}</strong></td>
+            <td>
+              <select class="status-select status-${r.status}" onchange="updateResStatus('${r.id}', this.value)">
+                <option value="CONFIRMED" ${r.status==='CONFIRMED'?'selected':''}>CONFIRMED</option>
+                <option value="SEATED" ${r.status==='SEATED'?'selected':''}>SEATED</option>
+                <option value="COMPLETED" ${r.status==='COMPLETED'?'selected':''}>COMPLETED</option>
+                <option value="CANCELLED" ${r.status==='CANCELLED'?'selected':''}>CANCELLED</option>
+              </select>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      function renderMenu(data) {
+        const menuContainer = document.getElementById('menuCategories');
+        const tablesContainer = document.getElementById('tablesGrid');
+
+        const items = data.menu || [];
+        const categories = {};
+        items.forEach(i => {
+          const cat = i.category || 'Special';
+          if (!categories[cat]) categories[cat] = [];
+          categories[cat].push(i);
+        });
+
+        let catHtml = '';
+        for (const [catName, catItems] of Object.entries(categories)) {
+          catHtml += `<h3 class="menu-cat-title">● ${catName.toUpperCase()}</h3><div class="menu-grid">`;
+          catItems.forEach(item => {
+            const dietary = (item.dietary || []).map(d => `<span class="dietary-tag">${d}</span>`).join('');
+            catHtml += `
+              <div class="menu-item-card">
+                <div class="menu-item-top">
+                  <div class="menu-item-name">${escapeHtml(item.name)} ${dietary}</div>
+                  <div class="menu-item-price">£${(item.price || 0).toFixed(2)}</div>
+                </div>
+                <div class="menu-item-desc">${escapeHtml(item.description || '')}</div>
+              </div>
+            `;
+          });
+          catHtml += `</div>`;
+        }
+        menuContainer.innerHTML = catHtml;
+
+        const tables = data.tables || [];
+        tablesContainer.innerHTML = tables.map(t => `
+          <div class="menu-item-card" style="text-align:center; padding:18px 12px;">
+            <div style="font-family:var(--font-mono); font-size:20px; font-weight:800; color:var(--cyan-bright); margin-bottom:4px;">Table ${t.id}</div>
+            <div style="font-size:13px; color:var(--text-muted);">${t.seats} seats capacity</div>
+            <div style="margin-top:8px;"><span class="order-badge-type" style="background:rgba(16,185,129,0.1);color:#10b981;border-color:rgba(16,185,129,0.3);">Bookable</span></div>
+          </div>
+        `).join('');
+      }
+
+      // Status updates
+      window.updateOrderStatus = async function(orderId, newStatus) {
+        try {
+          const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + currentAdminToken
+            },
+            body: JSON.stringify({ status: newStatus })
+          });
+          if (res.ok) {
+            showToast(`Order #${orderId} marked as ${newStatus}`, 'success');
+            loadAllData();
+          } else {
+            showToast('Failed to update status', 'error');
+          }
+        } catch (e) {
+          showToast('Network error while updating status', 'error');
+        }
+      };
+
+      window.updateResStatus = async function(resId, newStatus) {
+        try {
+          const res = await fetch(`/api/admin/reservations/${resId}/status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + currentAdminToken
+            },
+            body: JSON.stringify({ status: newStatus })
+          });
+          if (res.ok) {
+            showToast(`Booking #${resId} marked as ${newStatus}`, 'success');
+            loadAllData();
+          } else {
+            showToast('Failed to update booking status', 'error');
+          }
+        } catch (e) {
+          showToast('Network error while updating booking', 'error');
+        }
+      };
+
+      // Filters & Search handlers
+      document.querySelectorAll('#orderFilterChips .filter-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('#orderFilterChips .filter-chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          currentOrderFilter = chip.getAttribute('data-filter');
+          renderOrders();
+        });
+      });
+
+      document.getElementById('orderSearchInput').addEventListener('input', renderOrders);
+
+      document.querySelectorAll('#resFilterChips .filter-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('#resFilterChips .filter-chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          currentResFilter = chip.getAttribute('data-filter');
+          renderReservations();
+        });
+      });
+
+      document.getElementById('resSearchInput').addEventListener('input', renderReservations);
+
+      refreshBtn.addEventListener('click', () => {
+        loadAllData();
+        showToast('Data refreshed', 'success');
+      });
+
+      function startAutoRefresh() {
+        stopAutoRefresh();
+        autoRefreshTimer = setInterval(() => {
+          if (document.visibilityState === 'visible') {
+            loadAllData();
+          }
+        }, 10000);
+      }
+
+      function stopAutoRefresh() {
+        if (autoRefreshTimer) {
+          clearInterval(autoRefreshTimer);
+          autoRefreshTimer = null;
+        }
+      }
+
+      function escapeHtml(str) {
+        return (str || '').replace(/[&<>'"]/g, tag => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        }[tag] || tag));
+      }
+
+      // Initialize
+      initTheme();
+      checkAuth();
+    })();
+  </script>
+</body>
+</html>

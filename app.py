@@ -38,13 +38,15 @@ if os.path.exists(_env_file):
     except Exception:
         pass
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response, Header, Cookie, Depends
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from typing import Optional
 from openai import OpenAI
 
 import domain
+import data
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("amverio")
@@ -236,18 +238,165 @@ def chat(req: ChatRequest):
     return ChatResponse(thread_id=req.thread_id, reply=reply)
 
 
+# ---------------------------------------------------------------------------
+# Client Admin Portal Auth & API Endpoints
+# ---------------------------------------------------------------------------
+ADMIN_USERNAME = os.environ.get("AMVERIO_ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("AMVERIO_ADMIN_PASSWORD", "amverio2026")
+_admin_sessions: set[str] = set()
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str
+
+
+class ReservationStatusUpdate(BaseModel):
+    status: str
+
+
+def _require_admin(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    amverio_admin_token: Optional[str] = Cookie(None),
+) -> str:
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ", 1)[1].strip()
+    elif amverio_admin_token:
+        token = amverio_admin_token
+    elif "x-admin-token" in request.headers:
+        token = request.headers["x-admin-token"]
+
+    if not token or token not in _admin_sessions:
+        raise HTTPException(status_code=401, detail="Unauthorized: Please log in to admin portal.")
+    return token
+
+
+@app.post("/api/admin/login")
+def admin_login(req: AdminLoginRequest, response: Response):
+    if req.username == ADMIN_USERNAME and req.password == ADMIN_PASSWORD:
+        token = str(uuid.uuid4())
+        _admin_sessions.add(token)
+        response.set_cookie(
+            key="amverio_admin_token",
+            value=token,
+            httponly=False,
+            samesite="lax",
+            max_age=86400 * 7,
+        )
+        return {"ok": True, "token": token, "username": req.username}
+    raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+
+@app.post("/api/admin/logout")
+def admin_logout(response: Response, token: str = Depends(_require_admin)):
+    _admin_sessions.discard(token)
+    response.delete_cookie(key="amverio_admin_token")
+    return {"ok": True}
+
+
+@app.get("/api/admin/check-auth")
+def admin_check_auth(token: str = Depends(_require_admin)):
+    return {"authenticated": True, "username": ADMIN_USERNAME}
+
+
+@app.get("/api/admin/overview")
+def admin_overview(_token: str = Depends(_require_admin)):
+    orders = data.ORDERS
+    reservations = data.RESERVATIONS
+    total_sales = sum(float(o.get("total", 0)) for o in orders)
+    orders_count = len(orders)
+    avg_order_value = round(total_sales / orders_count, 2) if orders_count else 0.0
+    active_reservations = sum(1 for r in reservations if r.get("status") in ("CONFIRMED", "SEATED"))
+
+    return {
+        "business": {
+            "name": data.BUSINESS.get("name", "The Copper Fork"),
+            "cuisine": data.BUSINESS.get("cuisine", "Modern British bistro & grill"),
+            "currency": data.BUSINESS.get("currency", "GBP"),
+            "address": data.BUSINESS.get("address", "14 Mill Lane"),
+        },
+        "stats": {
+            "total_sales": round(total_sales, 2),
+            "orders_count": orders_count,
+            "reservations_count": len(reservations),
+            "active_reservations": active_reservations,
+            "avg_order_value": avg_order_value,
+            "currency_symbol": "£",
+            "active_threads": len(THREADS),
+        },
+        "recent_orders": list(reversed(orders[-8:])),
+        "recent_reservations": list(reversed(reservations[-8:])),
+    }
+
+
+@app.get("/api/admin/orders")
+def admin_orders(_token: str = Depends(_require_admin)):
+    return {"orders": list(reversed(data.ORDERS))}
+
+
+@app.post("/api/admin/orders/{order_id}/status")
+def admin_update_order_status(order_id: str, req: OrderStatusUpdate, _token: str = Depends(_require_admin)):
+    for order in data.ORDERS:
+        if order.get("id") == order_id:
+            order["status"] = req.status.strip().upper()
+            return {"ok": True, "order": order}
+    raise HTTPException(status_code=404, detail=f"Order {order_id} not found.")
+
+
+@app.get("/api/admin/reservations")
+def admin_reservations(_token: str = Depends(_require_admin)):
+    return {"reservations": list(reversed(data.RESERVATIONS))}
+
+
+@app.post("/api/admin/reservations/{res_id}/status")
+def admin_update_reservation_status(res_id: str, req: ReservationStatusUpdate, _token: str = Depends(_require_admin)):
+    for res in data.RESERVATIONS:
+        if res.get("id") == res_id:
+            res["status"] = req.status.strip().upper()
+            return {"ok": True, "reservation": res}
+    raise HTTPException(status_code=404, detail=f"Reservation {res_id} not found.")
+
+
+@app.get("/api/admin/menu")
+def admin_menu(_token: str = Depends(_require_admin)):
+    return {
+        "menu": data.MENU,
+        "tables": data.TABLES,
+        "business": {
+            "name": data.BUSINESS.get("name"),
+            "cuisine": data.BUSINESS.get("cuisine"),
+            "currency": data.BUSINESS.get("currency"),
+            "address": data.BUSINESS.get("address"),
+        },
+    }
+
+
+def _admin_page():
+    return FileResponse(os.path.join(_here, "static", "admin.html"))
+
+
+app.add_api_route("/admin", _admin_page, methods=["GET", "HEAD"], include_in_schema=False)
+app.add_api_route("/admin/", _admin_page, methods=["GET", "HEAD"], include_in_schema=False)
+
+
 def _demo_page():
     return FileResponse(os.path.join(_here, "static", "demo.html"))
 
 
-app.add_api_route("/demo", _demo_page, methods=["GET"], include_in_schema=False)
-app.add_api_route("/demo/", _demo_page, methods=["GET"], include_in_schema=False)
-app.add_api_route("/restaurant", _demo_page, methods=["GET"], include_in_schema=False)
-app.add_api_route("/restaurant/", _demo_page, methods=["GET"], include_in_schema=False)
+app.add_api_route("/demo", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
+app.add_api_route("/demo/", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
+app.add_api_route("/restaurant", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
+app.add_api_route("/restaurant/", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
 
 for _path in domain.domain_paths():
-    app.add_api_route(f"/{_path}", _demo_page, methods=["GET"], include_in_schema=False)
-    app.add_api_route(f"/{_path}/", _demo_page, methods=["GET"], include_in_schema=False)
+    app.add_api_route(f"/{_path}", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
+    app.add_api_route(f"/{_path}/", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
 
 
 # Serve static files (index.html at root is the Amverio marketing site).
