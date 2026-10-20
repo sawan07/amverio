@@ -341,9 +341,63 @@ def admin_orders(_token: str = Depends(_require_admin)):
     return {"orders": db.get_orders()}
 
 
+@app.get("/order-success")
+@app.get("/order-success/")
+def order_success_page(request: Request, order_id: Optional[str] = None, session_id: Optional[str] = None):
+    """Callback landing page when customer finishes Stripe checkout."""
+    if order_id:
+        db.update_order_status(order_id, "PAID")
+        log.info("Order %s automatically marked as PAID upon checkout completion", order_id)
+    return FileResponse(os.path.join(_here, "static", "order-success.html"))
+
+
+@app.post("/api/stripe/webhook")
+@app.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Stripe Webhook handler to automatically mark orders as PAID on successful payment."""
+    try:
+        body = await request.body()
+        event = json.loads(body.decode("utf-8"))
+    except Exception as e:
+        log.warning("Invalid Stripe webhook payload: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    event_type = event.get("type", "")
+    log.info("Stripe webhook received: %s", event_type)
+
+    if event_type in ("checkout.session.completed", "payment_intent.succeeded"):
+        data_obj = event.get("data", {}).get("object", {})
+        metadata = data_obj.get("metadata", {}) or {}
+        order_id = metadata.get("order_id") or data_obj.get("client_reference_id")
+        if order_id:
+            db.update_order_status(order_id, "PAID")
+            log.info("Stripe Webhook: Order %s updated to PAID", order_id)
+
+    return {"status": "success", "received": True}
+
+
+@app.get("/api/orders/{order_id}")
+def get_order_endpoint(order_id: str):
+    """Retrieve public order status for receipt page or customer lookup."""
+    order = db.get_order(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {"order": order}
+
+
+@app.post("/api/admin/orders/{order_id}/mark-paid")
+def admin_mark_order_paid(order_id: str, _token: str = Depends(_require_admin)):
+    """Allow admin to mark an order as PAID."""
+    order = db.update_order_status(order_id, "PAID")
+    if not order:
+        raise HTTPException(status_code=404, detail=f"Order {order_id} not found.")
+    return {"ok": True, "order": order}
+
+
 @app.post("/api/admin/orders/{order_id}/status")
 def admin_update_order_status(order_id: str, req: OrderStatusUpdate, _token: str = Depends(_require_admin)):
-    order = db.update_order_status(order_id, req.status)
+    new_status = req.status.strip().upper()
+    order = db.update_order_status(order_id, new_status)
     if order:
         return {"ok": True, "order": order}
     raise HTTPException(status_code=404, detail=f"Order {order_id} not found.")

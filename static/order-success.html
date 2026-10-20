@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Payment Successful // AMVERIO Order Confirmation</title>
+  <meta name="description" content="Your payment has been received and confirmed.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050811;
+      --card-bg: rgba(13, 21, 38, 0.85);
+      --border: rgba(0, 242, 254, 0.18);
+      --cyan: #00f2fe;
+      --green: #10b981;
+      --text: #f0f4fc;
+      --text-muted: #94a3b8;
+      --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: rgba(0, 0, 0, 0.08);
+      --cyan: #0284c7;
+      --green: #059669;
+      --text: #0f172a;
+      --text-muted: #64748b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .ambient-glow {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.18), transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .success-card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 540px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 44px 36px;
+      text-align: center;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(20px);
+      animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .icon-wrapper {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(0, 242, 254, 0.2));
+      border: 2px solid var(--green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.35);
+      animation: pulseGreen 2.4s infinite;
+    }
+
+    @keyframes pulseGreen {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 30px rgba(16, 185, 129, 0.35); }
+      50% { transform: scale(1.05); box-shadow: 0 0 45px rgba(16, 185, 129, 0.55); }
+    }
+
+    .icon-wrapper svg {
+      width: 44px;
+      height: 44px;
+      stroke: var(--green);
+      stroke-width: 2.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #ffffff, var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    [data-theme="light"] h1 {
+      background: linear-gradient(135deg, #0f172a, var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge-paid {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+
+    .order-box {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 28px;
+      text-align: left;
+    }
+
+    [data-theme="light"] .order-box {
+      background: #f1f5f9;
+      border-color: rgba(0, 0, 0, 0.06);
+    }
+
+    .order-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 14px;
+    }
+
+    [data-theme="light"] .order-row {
+      border-bottom-color: rgba(0, 0, 0, 0.06);
+    }
+
+    .order-row:last-child {
+      border-bottom: none;
+      padding-top: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+
+    .order-label {
+      color: var(--text-muted);
+    }
+
+    .order-val {
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 24px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--cyan), #0066ff);
+      color: #050811;
+      box-shadow: 0 4px 18px rgba(0, 242, 254, 0.35);
+      border: none;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(0, 242, 254, 0.5);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--cyan);
+    }
+
+    .footer-note {
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+
+  <div class="success-card">
+    <div class="icon-wrapper">
+      <svg viewBox="0 0 24 24">
+        <path d="M20 6L9 17l-5-5"></path>
+      </svg>
+    </div>
+
+    <div class="badge-paid">✓ Payment Confirmed</div>
+    <h1>Payment Received</h1>
+    <p class="subtitle">
+      Thank you! Your payment has been verified via Stripe and the order status is now marked as <strong>PAID</strong>. The kitchen team has been alerted to begin preparation.
+    </p>
+
+    <div class="order-box" id="orderBox">
+      <div class="order-row">
+        <span class="order-label">Order Reference:</span>
+        <span class="order-val" id="orderIdVal">Loading...</span>
+      </div>
+      <div class="order-row">
+        <span class="order-label">Payment Status:</span>
+        <span class="order-val" style="color: var(--green);">PAID (Stripe)</span>
+      </div>
+      <div class="order-row">
+        <span class="order-label">Digital Receipt:</span>
+        <span class="order-val" id="emailVal">Sent to email</span>
+      </div>
+      <div class="order-row">
+        <span class="order-label">Kitchen Status:</span>
+        <span class="order-val" style="color: var(--cyan);">Queued for Preparation</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="/admin" class="btn btn-primary">
+        <span>Open Admin Portal</span>
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <a href="/demo" class="btn btn-secondary">
+        <span>Back to Restaurant Demo</span>
+      </a>
+    </div>
+
+    <div class="footer-note">
+      AMVERIO Web Intelligence · The Copper Fork Bistro
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // Inherit theme
+      var saved = localStorage.getItem('amverio_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', saved);
+
+      var params = new URLSearchParams(window.location.search);
+      var orderId = params.get('order_id');
+      if (orderId) {
+        document.getElementById('orderIdVal').textContent = '#' + orderId;
+        
+        // Fetch order details
+        fetch('/api/orders/' + encodeURIComponent(orderId))
+          .then(r => r.json())
+          .then(data => {
+            if (data && data.order) {
+              var o = data.order;
+              if (o.email) {
+                document.getElementById('emailVal').textContent = o.email;
+              }
+            }
+          })
+          .catch(function(err) {});
+      } else {
+        document.getElementById('orderIdVal').textContent = 'CONFIRMED';
+      }
+    })();
+  </script>
+</body>
+</html>

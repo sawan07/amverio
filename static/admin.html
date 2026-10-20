@@ -523,12 +523,40 @@
       transition: all 0.2s ease;
     }
 
-    .status-RECEIVED { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
+    .status-RECEIVED,
+    .status-PENDING_PAYMENT { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
     .status-PREPARING { background: rgba(2, 132, 199, 0.15); color: #0284c7; border-color: rgba(2, 132, 199, 0.4); }
     .status-READY { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
     .status-COMPLETED { background: rgba(100, 116, 139, 0.15); color: #94a3b8; border-color: rgba(100, 116, 139, 0.4); }
-    .status-PAID { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
+    .status-PAID { 
+      background: rgba(16, 185, 129, 0.18); 
+      color: #10b981; 
+      border-color: rgba(16, 185, 129, 0.55); 
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
+    }
     .status-CANCELLED { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
+
+    .btn-mark-paid {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #ffffff;
+      border: none;
+      border-radius: 9999px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+      white-space: nowrap;
+    }
+    .btn-mark-paid:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.5);
+    }
 
     .order-middle {
       display: grid;
@@ -1010,10 +1038,10 @@
         <div class="filter-bar">
           <div class="filter-chips" id="orderFilterChips">
             <button class="filter-chip active" data-filter="ALL">All Orders</button>
-            <button class="filter-chip" data-filter="RECEIVED">Received</button>
+            <button class="filter-chip" data-filter="UNPAID">Awaiting Payment</button>
+            <button class="filter-chip" data-filter="PAID">Paid</button>
             <button class="filter-chip" data-filter="PREPARING">Preparing</button>
             <button class="filter-chip" data-filter="READY">Ready</button>
-            <button class="filter-chip" data-filter="PAID">Paid</button>
             <button class="filter-chip" data-filter="COMPLETED">Completed</button>
           </div>
           <input type="text" id="orderSearchInput" class="search-input" placeholder="Search customer, phone, ID…">
@@ -1307,7 +1335,7 @@
             <div class="order-card" style="padding: 12px;">
               <div class="order-top" style="margin-bottom:6px; padding-bottom:6px;">
                 <span class="order-id-tag">#${o.id}</span>
-                <span class="status-select status-${o.status}">${o.status}</span>
+                <span class="status-select status-${o.status}">${(o.status === 'PENDING_PAYMENT' || o.status === 'RECEIVED') ? '⚠️ UNPAID' : (o.status === 'PAID' ? '✓ PAID' : o.status)}</span>
               </div>
               <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
                 <div>
@@ -1342,7 +1370,13 @@
         const search = (document.getElementById('orderSearchInput').value || '').toLowerCase().trim();
 
         const filtered = ordersData.filter(o => {
-          if (currentOrderFilter !== 'ALL' && o.status !== currentOrderFilter) return false;
+          if (currentOrderFilter !== 'ALL') {
+            if (currentOrderFilter === 'UNPAID') {
+              if (o.status !== 'PENDING_PAYMENT' && o.status !== 'RECEIVED') return false;
+            } else if (o.status !== currentOrderFilter) {
+              return false;
+            }
+          }
           if (search) {
             const matchesId = (o.id || '').toLowerCase().includes(search);
             const matchesName = (o.name || '').toLowerCase().includes(search);
@@ -1373,6 +1407,38 @@
             ? `<span style="font-size:11px;color:#10b981;">✉️ Digital Receipt: Sent to ${escapeHtml(o.email_sent_to)}</span>`
             : '';
 
+          const isUnpaid = (o.status === 'PENDING_PAYMENT' || o.status === 'RECEIVED');
+
+          let statusControlHtml = '';
+          if (isUnpaid) {
+            statusControlHtml = `
+              <div style="display:flex; align-items:center; gap: 8px; flex-wrap:wrap; justify-content:flex-end;">
+                <button class="btn-mark-paid" onclick="markOrderPaid('${o.id}')" title="Mark cash/card payment or verify Stripe">
+                  💳 Mark as Paid
+                </button>
+                <select class="status-select status-${o.status}" onchange="updateOrderStatus('${o.id}', this.value)">
+                  <option value="${o.status}" selected>⚠️ AWAITING PAYMENT</option>
+                  <option value="PAID">✓ MARK AS PAID</option>
+                  <option value="CANCELLED">✕ CANCEL ORDER</option>
+                  <option disabled>───────────────</option>
+                  <option disabled>PREPARING (Pay first to unlock)</option>
+                  <option disabled>READY (Pay first to unlock)</option>
+                  <option disabled>COMPLETED (Pay first to unlock)</option>
+                </select>
+              </div>
+            `;
+          } else {
+            statusControlHtml = `
+              <select class="status-select status-${o.status}" onchange="updateOrderStatus('${o.id}', this.value)">
+                <option value="PAID" ${o.status==='PAID'?'selected':''}>✓ PAID (Confirmed)</option>
+                <option value="PREPARING" ${o.status==='PREPARING'?'selected':''}>🍳 PREPARING</option>
+                <option value="READY" ${o.status==='READY'?'selected':''}>🔔 READY</option>
+                <option value="COMPLETED" ${o.status==='COMPLETED'?'selected':''}>📦 COMPLETED</option>
+                <option value="CANCELLED" ${o.status==='CANCELLED'?'selected':''}>✕ CANCELLED</option>
+              </select>
+            `;
+          }
+
           return `
             <div class="order-card">
               <div class="order-top">
@@ -1382,14 +1448,7 @@
                   <span style="font-size:12px; color:var(--text-muted);">${o.created_at || ''}</span>
                 </div>
                 <div>
-                  <select class="status-select status-${o.status}" onchange="updateOrderStatus('${o.id}', this.value)">
-                    <option value="RECEIVED" ${o.status==='RECEIVED'?'selected':''}>RECEIVED</option>
-                    <option value="PREPARING" ${o.status==='PREPARING'?'selected':''}>PREPARING</option>
-                    <option value="READY" ${o.status==='READY'?'selected':''}>READY</option>
-                    <option value="PAID" ${o.status==='PAID'?'selected':''}>PAID</option>
-                    <option value="COMPLETED" ${o.status==='COMPLETED'?'selected':''}>COMPLETED</option>
-                    <option value="CANCELLED" ${o.status==='CANCELLED'?'selected':''}>CANCELLED</option>
-                  </select>
+                  ${statusControlHtml}
                 </div>
               </div>
 
@@ -1502,6 +1561,26 @@
       }
 
       // Status updates
+      window.markOrderPaid = async function(orderId) {
+        try {
+          const res = await fetch(`/api/admin/orders/${orderId}/mark-paid`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + currentAdminToken
+            }
+          });
+          if (res.ok) {
+            showToast(`Payment confirmed! Order #${orderId} marked as PAID`, 'success');
+            loadAllData();
+          } else {
+            showToast('Failed to mark order as paid', 'error');
+          }
+        } catch (e) {
+          showToast('Network error while marking paid', 'error');
+        }
+      };
+
       window.updateOrderStatus = async function(orderId, newStatus) {
         try {
           const res = await fetch(`/api/admin/orders/${orderId}/status`, {

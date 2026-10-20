@@ -205,6 +205,8 @@ def _create_stripe_payment_link(order_id: str, line_items: list, total: float, c
             ("metadata[customer_name]", customer_name),
             ("metadata[customer_email]", customer_email),
             ("restrictions[completed_sessions][limit]", "1"),
+            ("after_completion[type]", "redirect"),
+            ("after_completion[redirect][url]", f"https://amverio.co.uk/order-success?order_id={order_id}&session_id={{CHECKOUT_SESSION_ID}}"),
         ]
         for idx, item in enumerate(line_items):
             unit_pence = int(round(item["unit_price"] * 100))
@@ -242,7 +244,7 @@ def _create_stripe_payment_link(order_id: str, line_items: list, total: float, c
         form_fields = [
             ("mode", "payment"),
             ("customer_email", customer_email),
-            ("success_url", "https://amverio.co.uk/order-success?session_id={CHECKOUT_SESSION_ID}"),
+            ("success_url", f"https://amverio.co.uk/order-success?order_id={order_id}&session_id={{CHECKOUT_SESSION_ID}}"),
             ("cancel_url", "https://amverio.co.uk/order-cancel"),
             ("client_reference_id", order_id),
             ("metadata[order_id]", order_id),
@@ -465,7 +467,7 @@ def place_order(
         "name": customer_name,
         "phone": customer_phone,
         "email": customer_email,
-        "status": "RECEIVED",
+        "status": "PENDING_PAYMENT",
         "total": round_total,
         "payment": "Stripe Sandbox",
         "payment_link": payment_link,

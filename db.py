@@ -349,6 +349,21 @@ def get_orders() -> list[dict]:
         conn.close()
 
 
+def get_order(order_id: str) -> Optional[dict]:
+    """Retrieve a single order by ID."""
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    try:
+        sql = "SELECT id, items, order_type, name, phone, email, status, total, payment, payment_link, email_sent_to, email_status, created_at FROM orders WHERE id = %s;" if is_pg else "SELECT id, items, order_type, name, phone, email, status, total, payment, payment_link, email_sent_to, email_status, created_at FROM orders WHERE id = ?;"
+        cur.execute(sql, (order_id,))
+        row = cur.fetchone()
+        return _row_to_order(row) if row else None
+    finally:
+        cur.close()
+        conn.close()
+
+
 def add_order(order: dict) -> dict:
     """Insert a new order into DB."""
     is_pg = _is_postgres()
@@ -370,7 +385,7 @@ def add_order(order: dict) -> dict:
             order.get("name", "Guest"),
             order.get("phone", ""),
             order.get("email", ""),
-            order.get("status", "RECEIVED"),
+            order.get("status", "PENDING_PAYMENT"),
             float(order.get("total", 0.0)),
             order.get("payment", "Standard"),
             order.get("payment_link", ""),
