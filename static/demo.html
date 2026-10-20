@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DineSync — Amverio Restaurant Assistant Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Immediate Theme Initialization -->
+<script>
+  (function() {
+    try {
+      var saved = localStorage.getItem('amverio_theme');
+      var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch(e) {}
+  })();
+</script>
+<style>
+  :root{
+    --bg:#070b14;
+    --panel:#0d1526;
+    --fg:#f1f5f9;
+    --muted:#94a3b8;
+    --line:#1e293b;
+    --accent:#00f2fe;
+    --accent-fg:#050811;
+    --bubble-user:#0284c7;
+    --bubble-user-fg:#ffffff;
+    --bubble-agent:#131f37;
+    --bubble-agent-fg:#f8fafc;
+    color-scheme: dark;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  :root[data-theme="light"]{
+    --bg:#f8fafc;
+    --panel:#ffffff;
+    --fg:#0f172a;
+    --muted:#64748b;
+    --line:#e2e8f0;
+    --accent:#0284c7;
+    --accent-fg:#ffffff;
+    --bubble-user:#0284c7;
+    --bubble-user-fg:#ffffff;
+    --bubble-agent:#f1f5f9;
+    --bubble-agent-fg:#0f172a;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"]{
+    --bg:#070b14;
+    --panel:#0d1526;
+    --fg:#f1f5f9;
+    --muted:#94a3b8;
+    --line:#1e293b;
+    --accent:#00f2fe;
+    --accent-fg:#050811;
+    --bubble-user:#0284c7;
+    --bubble-user-fg:#ffffff;
+    --bubble-agent:#131f37;
+    --bubble-agent-fg:#f8fafc;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box}
+  /* .picker/.chat-screen set display:flex, which would otherwise beat the hidden attribute */
+  [hidden]{display:none !important}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--fg);
+    font-family:var(--font, 'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif);
+    display:flex;
+    flex-direction:column;
+  }
+  .app{
+    max-width:720px;
+    width:100%;
+    margin:0 auto;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Picker screen -- "who would you like to talk to?"                 */
+  /* ---------------------------------------------------------------- */
+  .picker{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding:32px 20px;
+    gap:28px;
+  }
+  .picker-head{
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .picker-head h1{
+    margin:0;
+    font-size:22px;
+    font-weight:600;
+    letter-spacing:-0.2px;
+  }
+  .picker-head p{
+    margin:0;
+    color:var(--muted);
+    font-size:14px;
+  }
+  .domain-cards{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .domain-card{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    text-align:left;
+    width:100%;
+    padding:16px 18px;
+    border-radius:16px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--fg);
+    font-family:inherit;
+    cursor:pointer;
+    transition:border-color 0.15s, transform 0.1s;
+  }
+  .domain-card:hover{border-color:var(--accent)}
+  .domain-card:active{transform:scale(0.99)}
+  .domain-card .domain-card-name{font-weight:600;font-size:16px}
+  .domain-card .domain-card-tag{
+    font-family:'IBM Plex Mono',ui-monospace,monospace;
+    font-size:11px;
+    letter-spacing:0.4px;
+    color:var(--muted);
+  }
+  .picker-status{
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Chat screen                                                        */
+  /* ---------------------------------------------------------------- */
+  .chat-screen{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    min-height:0;
+  }
+
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 18px;
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    border-bottom:1px solid var(--line);
+    background:var(--panel);
+  }
+  .brand{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .brand .name{font-weight:600;font-size:16px;color:var(--brand-fg, var(--fg));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand .tag{
+    font-family:var(--tag-font, 'IBM Plex Mono',ui-monospace,monospace);
+    font-size:11px;
+    letter-spacing:0.4px;
+    color:var(--tag-fg, var(--muted));
+    white-space:nowrap;
+  }
+  .brand-row{display:flex;align-items:center;gap:12px;min-width:0}
+  .brand-logo{height:44px;width:auto;flex:none;display:block}
+  .top-bar{
+    background:var(--topbar-bg);
+    color:var(--topbar-fg);
+    font-size:12px;
+    letter-spacing:0.3px;
+    text-align:center;
+    padding:7px 12px;
+    padding-top: calc(7px + env(safe-area-inset-top, 0px));
+  }
+  .header-actions{display:flex;align-items:center;gap:8px;flex:none}
+  .theme-toggle-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 3px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.25s ease;
+    outline: none;
+  }
+  .theme-toggle-btn:hover {
+    border-color: var(--accent);
+  }
+  .theme-toggle-track {
+    width: 44px;
+    height: 22px;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .theme-toggle-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    color: var(--accent-fg);
+    position: absolute;
+    left: 2px;
+  }
+  :root[data-theme="light"] .theme-toggle-thumb {
+    transform: translateX(22px);
+  }
+  .icon-sun, .icon-moon {
+    position: absolute;
+    transition: all 0.25s ease;
+  }
+  .icon-sun {
+    opacity: 0;
+    transform: rotate(-60deg) scale(0.5);
+  }
+  .icon-moon {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+  :root[data-theme="light"] .icon-sun {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+  :root[data-theme="light"] .icon-moon {
+    opacity: 0;
+    transform: rotate(60deg) scale(0.5);
+  }
+  .amv-symbol-a {
+    fill: #ffffff;
+    filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.45));
+    transition: fill 0.3s ease, filter 0.3s ease;
+  }
+  :root[data-theme="light"] .amv-symbol-a {
+    fill: #0B1B36;
+    filter: none;
+  }
+  button.new-order{
+    flex:none;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:600;
+    color:#ffffff;
+    background:linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+    border:1px solid rgba(255, 255, 255, 0.25);
+    border-radius:var(--btn-radius, 999px);
+    padding:8px 16px;
+    cursor:pointer;
+    box-shadow: 0 2px 10px rgba(2, 132, 199, 0.3);
+    transition: all 0.2s ease;
+  }
+  button.new-order:hover{
+    box-shadow: 0 4px 16px rgba(2, 132, 199, 0.5);
+    transform: translateY(-1px);
+  }
+  button.new-order:active{transform: translateY(0); opacity:0.9}
+  .switch-agent{
+    flex:none;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:600;
+    color:var(--fg);
+    background:rgba(255, 255, 255, 0.05);
+    border:1px solid var(--line);
+    border-radius:var(--btn-radius, 999px);
+    padding:8px 16px;
+    cursor:pointer;
+    text-decoration:none;
+    display:inline-flex;
+    align-items:center;
+    transition: all 0.2s ease;
+  }
+  .switch-agent:hover{
+    border-color:var(--accent);
+    color:var(--accent);
+    background:rgba(255, 255, 255, 0.08);
+  }
+  .switch-agent:active{opacity:0.7}
+
+  main{
+    flex:1;
+    overflow-y:auto;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .row{display:flex;min-width:0}
+  .row.user{justify-content:flex-end}
+  .row.agent{justify-content:flex-start}
+  .bubble{
+    max-width:80%;
+    padding:10px 14px;
+    border-radius:var(--bubble-radius, 16px);
+    font-size:14.5px;
+    line-height:1.5;
+    white-space:pre-wrap;
+    word-wrap:break-word;
+    min-width:0;
+  }
+  .row.user .bubble{
+    background:var(--bubble-user);
+    color:var(--bubble-user-fg);
+    border-bottom-right-radius:4px;
+  }
+  .row.agent .bubble{
+    background:var(--bubble-agent);
+    color:var(--bubble-agent-fg);
+    border:1px solid var(--line);
+    border-bottom-left-radius:4px;
+  }
+  .bubble a{
+    color:inherit;
+    text-decoration:underline;
+    text-underline-offset:2px;
+    font-weight:600;
+    word-break:break-all;
+  }
+  .row.agent .bubble a{
+    color:var(--accent);
+  }
+  .row.user .bubble a{
+    color:#ffffff;
+  }
+  .row.system .bubble{
+    background:transparent;
+    border:1px dashed var(--line);
+    color:var(--muted);
+    font-family:'IBM Plex Mono',ui-monospace,monospace;
+    font-size:12px;
+    margin:4px auto;
+  }
+  .row.system{justify-content:center}
+
+  .typing{
+    display:inline-flex;
+    gap:4px;
+    align-items:center;
+    padding:4px 2px;
+  }
+  .typing span{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--muted);
+    animation:bounce 1.2s infinite ease-in-out;
+  }
+  .typing span:nth-child(2){animation-delay:0.15s}
+  .typing span:nth-child(3){animation-delay:0.3s}
+  @keyframes bounce{
+    0%,80%,100%{transform:scale(0.6);opacity:0.5}
+    40%{transform:scale(1);opacity:1}
+  }
+
+  form{
+    display:flex;
+    gap:10px;
+    padding:12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top:1px solid var(--line);
+    background:var(--panel);
+  }
+  textarea{
+    flex:1;
+    min-width:0;
+    resize:none;
+    font-family:inherit;
+    font-size:14.5px;
+    line-height:1.4;
+    padding:10px 14px;
+    border-radius:14px;
+    border:1px solid var(--line);
+    background:var(--bg);
+    color:var(--fg);
+    max-height:120px;
+  }
+  textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+  button.send{
+    flex:none;
+    font-family:inherit;
+    font-weight:600;
+    font-size:14px;
+    color:#ffffff;
+    background:linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+    border:1px solid rgba(255, 255, 255, 0.2);
+    border-radius:var(--send-radius, 14px);
+    padding:0 20px;
+    cursor:pointer;
+    box-shadow: 0 2px 10px rgba(2, 132, 199, 0.3);
+    transition: all 0.2s ease;
+  }
+  button.send:hover:not(:disabled){
+    box-shadow: 0 4px 16px rgba(2, 132, 199, 0.5);
+    transform: translateY(-1px);
+  }
+  button.send:disabled{opacity:0.4;cursor:default}
+
+  .error-banner{
+    margin:0 18px;
+    padding:8px 12px;
+    border-radius:10px;
+    background:#a3702f22;
+    border:1px solid var(--future, #a3702f);
+    color:var(--fg);
+    font-size:13px;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+
+    <div class="picker" id="picker">
+      <div class="picker-head">
+        <h1>Amverio</h1>
+        <p>Choose who you'd like to talk to.</p>
+      </div>
+      <div class="domain-cards" id="domainCards"></div>
+      <div class="picker-status" id="pickerStatus" hidden></div>
+    </div>
+
+    <div class="chat-screen" id="chatScreen" hidden>
+      <div class="top-bar" id="topBar" hidden></div>
+      <header>
+        <div class="brand-row">
+          <svg style="width:38px; height:20px; flex-shrink:0; display:block;" viewBox="220 -20 1420 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="dmEyeGrad" x1="0%" y1="20%" x2="100%" y2="80%">
+                <stop offset="0%" stop-color="#00d2fa" />
+                <stop offset="50%" stop-color="#0099ff" />
+                <stop offset="100%" stop-color="#0052e8" />
+              </linearGradient>
+              <radialGradient id="dmCoreGrad" cx="38%" cy="34%" r="65%">
+                <stop offset="0%" stop-color="#80faff" />
+                <stop offset="35%" stop-color="#00d4ff" />
+                <stop offset="75%" stop-color="#0077ff" />
+                <stop offset="100%" stop-color="#0044cc" />
+              </radialGradient>
+            </defs>
+            <!-- Outer Cyber Eye Aperture -->
+            <path d="M 268 378 C 420 120, 660 10, 924 10 C 1188 10, 1428 120, 1580 378 L 1358 604 L 1264 510 L 1386 386 C 1264 192, 1094 122, 924 122 C 754 122, 584 192, 462 386 L 584 510 L 490 604 Z" fill="url(#dmEyeGrad)" />
+            <!-- The 'A' (White in dark mode, Navy in light mode) -->
+            <path class="amv-symbol-a" d="M 854 220 C 882 165, 966 165, 994 220 L 1288 705 L 1140 705 L 924 355 L 708 705 L 560 705 Z" />
+            <!-- Central Intelligence Sphere -->
+            <circle cx="924" cy="495" r="86" fill="url(#dmCoreGrad)" />
+          </svg>
+          <div class="brand">
+            <span class="name" id="brandName">The Copper Fork</span>
+            <span class="tag" id="brandTag">AMVERIO DINESYNC · AI RESTAURANT ASSISTANT</span>
+          </div>
+          <img id="brandLogo" class="brand-logo" alt="" hidden />
+        </div>
+        <div class="header-actions">
+          <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle light or dark theme" title="Toggle Light / Dark mode">
+            <span class="theme-toggle-track">
+              <span class="theme-toggle-thumb">
+                <svg class="icon-sun" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                </svg>
+                <svg class="icon-moon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+              </span>
+            </span>
+          </button>
+          <a href="/" class="switch-agent" id="switchAgentBtn" style="text-decoration:none; display:inline-flex; align-items:center; line-height:1;">← Amverio Site</a>
+          <button class="new-order" id="newOrderBtn" type="button">New conversation</button>
+        </div>
+      </header>
+
+      <main id="messages"></main>
+
+      <form id="chatForm">
+        <textarea id="input" rows="1" placeholder="Type a message…"></textarea>
+        <button class="send" id="sendBtn" type="submit">Send</button>
+      </form>
+    </div>
+
+  </div>
+
+<script>
+(function(){
+  const pickerEl = document.getElementById('picker');
+  const domainCardsEl = document.getElementById('domainCards');
+  const pickerStatusEl = document.getElementById('pickerStatus');
+  const chatScreenEl = document.getElementById('chatScreen');
+
+  const messagesEl = document.getElementById('messages');
+  const formEl = document.getElementById('chatForm');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('sendBtn');
+  const newOrderBtn = document.getElementById('newOrderBtn');
+  const switchAgentBtn = document.getElementById('switchAgentBtn');
+  const brandNameEl = document.getElementById('brandName');
+  const brandTagEl = document.getElementById('brandTag');
+  const brandLogoEl = document.getElementById('brandLogo');
+  const topBarEl = document.getElementById('topBar');
+  const rootEl = document.documentElement;
+  let appliedVars = [];
+
+  // Per-agent branding (e.g. JMG Cargo's own colours/logo). Inline vars on
+  // <html> override the default palette; clearTheme() puts it back.
+  function applyTheme(theme){
+    clearTheme();
+    if (!theme) return;
+    Object.entries(theme.vars || {}).forEach(function(kv){
+      rootEl.style.setProperty(kv[0], kv[1]);
+      appliedVars.push(kv[0]);
+    });
+    if (theme.color_scheme) rootEl.setAttribute('data-theme', theme.color_scheme);
+    if (theme.logo_url && brandLogoEl){
+      brandLogoEl.src = theme.logo_url;
+      brandLogoEl.alt = '';
+      brandLogoEl.hidden = false;
+    }
+    if (theme.top_bar && topBarEl){
+      topBarEl.textContent = theme.top_bar;
+      topBarEl.hidden = false;
+    }
+  }
+
+  function clearTheme(){
+    appliedVars.forEach(function(v){ rootEl.style.removeProperty(v); });
+    appliedVars = [];
+    var savedTheme = localStorage.getItem('amverio_theme') || 'dark';
+    rootEl.setAttribute('data-theme', savedTheme);
+    if (brandLogoEl) {
+      brandLogoEl.hidden = true;
+      brandLogoEl.removeAttribute('src');
+    }
+    if (topBarEl) {
+      topBarEl.hidden = true;
+    }
+  }
+
+  let threadId = null;
+  let sending = false;
+  let selectedDomainId = null;
+  let domainsById = {};  // id -> {id, brand_name, brand_tag, greeting, new_conversation_label, input_placeholder}
+
+  function escapeHtml(str){
+    return (str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function formatMessage(text){
+    let safe = escapeHtml(text || '');
+    // Markdown links [text](https://...)
+    safe = safe.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    // Raw URLs (not preceded by href=")
+    safe = safe.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+    return safe;
+  }
+
+  function addRow(role, text){
+    const row = document.createElement('div');
+    row.className = 'row ' + role;
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    if (role === 'system'){
+      bubble.textContent = text;
+    } else {
+      bubble.innerHTML = formatMessage(text);
+    }
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return bubble;
+  }
+
+  function addTyping(){
+    const row = document.createElement('div');
+    row.className = 'row agent';
+    row.id = 'typingRow';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble typing';
+    bubble.innerHTML = '<span></span><span></span><span></span>';
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function removeTyping(){
+    const row = document.getElementById('typingRow');
+    if (row) row.remove();
+  }
+
+  // ---- Picker screen -------------------------------------------------
+
+  async function loadDomains(){
+    try {
+      const resp = await fetch('/api/domains');
+      if (!resp.ok) throw new Error('bad response');
+      const data = await resp.json();
+      domainsById = {};
+      (data.domains || []).forEach(function(d){ domainsById[d.id] = d; });
+      const dedicated = pagePath && Object.values(domainsById).find(function(d){ return d.path === pagePath; });
+      if (dedicated || pagePath === 'restaurant' || pagePath === 'demo' || Object.keys(domainsById).length === 1){
+        const targetId = dedicated ? dedicated.id : (domainsById['restaurant'] ? 'restaurant' : Object.keys(domainsById)[0]);
+        selectDomain(targetId);
+        return;
+      }
+      renderDomainCards();
+    } catch (e) {
+      pickerEl.hidden = false;
+      pickerStatusEl.hidden = false;
+      pickerStatusEl.textContent = "Couldn't load the available agents. Please refresh.";
+    }
+  }
+
+  // A dedicated page like /jmgcargo opens straight into that agent.
+  const pagePath = location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+  let dedicatedDomainId = null;
+  if (pagePath) pickerEl.hidden = true;  // avoid flashing the picker first
+
+  function renderDomainCards(){
+    domainCardsEl.innerHTML = '';
+    Object.values(domainsById).filter(function(d){ return d.listed !== false; }).forEach(function(d){
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'domain-card';
+      const name = document.createElement('span');
+      name.className = 'domain-card-name';
+      name.textContent = d.brand_name;
+      const tag = document.createElement('span');
+      tag.className = 'domain-card-tag';
+      tag.textContent = d.brand_tag;
+      card.appendChild(name);
+      card.appendChild(tag);
+      card.addEventListener('click', function(){ selectDomain(d.id); });
+      domainCardsEl.appendChild(card);
+    });
+  }
+
+  async function selectDomain(domainId){
+    selectedDomainId = domainId;
+    const cfg = domainsById[domainId];
+    if (!cfg) return;
+
+    document.title = dedicatedDomainId ? cfg.brand_name + ' — Instant Quote' : cfg.brand_name + ' — Amverio Demo';
+    if (brandNameEl) brandNameEl.textContent = cfg.brand_name;
+    if (brandTagEl) brandTagEl.textContent = cfg.brand_tag;
+    if (newOrderBtn) newOrderBtn.textContent = cfg.new_conversation_label;
+    if (inputEl) inputEl.placeholder = cfg.input_placeholder;
+    applyTheme(cfg.theme);
+
+    if (pickerEl) pickerEl.hidden = true;
+    if (chatScreenEl) chatScreenEl.hidden = false;
+    if (inputEl) inputEl.focus();
+
+    await startNewThread(true);
+  }
+
+  function backToPicker(){
+    clearTheme();
+    chatScreenEl.hidden = true;
+    pickerEl.hidden = false;
+    threadId = null;
+    selectedDomainId = null;
+    messagesEl.innerHTML = '';
+  }
+
+  // ---- Chat screen -----------------------------------------------------
+
+  async function startNewThread(greet){
+    if (!selectedDomainId) return;
+    messagesEl.innerHTML = '';
+    try {
+      const resp = await fetch('/api/new-thread', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({domain: selectedDomainId})
+      });
+      if (!resp.ok){
+        addRow('system', "Couldn't start a new conversation. Please try again.");
+        return;
+      }
+      const data = await resp.json();
+      threadId = data.thread_id;
+    } catch (e) {
+      addRow('system', "Couldn't reach the server. Please try again.");
+      return;
+    }
+    if (greet){
+      addRow('agent', domainsById[selectedDomainId].greeting);
+    }
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    inputEl.focus();
+  }
+
+  async function sendMessage(text){
+    sending = true;
+    sendBtn.disabled = true;
+    addRow('user', text);
+    addTyping();
+    try {
+      const resp = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({thread_id: threadId, message: text})
+      });
+      removeTyping();
+      if (!resp.ok){
+        const err = await resp.json().catch(()=>({detail: 'Something went wrong.'}));
+        addRow('system', err.detail || ('Error ' + resp.status));
+        return;
+      }
+      const data = await resp.json();
+      addRow('agent', data.reply || '(no reply)');
+    } catch (e) {
+      removeTyping();
+      addRow('system', "Couldn't reach the server. Please try again.");
+    } finally {
+      sending = false;
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  formEl.addEventListener('submit', function(e){
+    e.preventDefault();
+    const text = inputEl.value.trim();
+    if (!text || sending) return;
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    sendMessage(text);
+  });
+
+  inputEl.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      formEl.requestSubmit();
+    }
+  });
+
+  inputEl.addEventListener('input', function(){
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+  });
+
+  if (newOrderBtn) {
+    newOrderBtn.addEventListener('click', function(){
+      startNewThread(true);
+    });
+  }
+
+  if (switchAgentBtn) {
+    switchAgentBtn.addEventListener('click', function(e){
+      if (switchAgentBtn.tagName === 'A' && switchAgentBtn.getAttribute('href') && switchAgentBtn.getAttribute('href') !== '#') {
+        return;
+      }
+      e.preventDefault();
+      backToPicker();
+    });
+  }
+
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  function updateThemeUI(theme) {
+    if (!themeToggleBtn) return;
+    const next = theme === 'light' ? 'dark' : 'light';
+    themeToggleBtn.setAttribute('aria-label', 'Switch to ' + next + ' theme');
+    themeToggleBtn.setAttribute('title', 'Switch to ' + next + ' theme');
+  }
+
+  const initialTheme = rootEl.getAttribute('data-theme') || 'dark';
+  updateThemeUI(initialTheme);
+
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', function() {
+      const current = rootEl.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+      const next = current === 'light' ? 'dark' : 'light';
+      rootEl.setAttribute('data-theme', next);
+      try {
+        localStorage.setItem('amverio_theme', next);
+      } catch(e) {}
+      updateThemeUI(next);
+    });
+  }
+
+  loadDomains();
+})();
+</script>
+</body>
+</html>

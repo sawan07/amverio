@@ -25,6 +25,19 @@ import uuid
 import logging
 from datetime import datetime
 
+# Load .env file if present
+_env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if os.path.exists(_env_file):
+    try:
+        with open(_env_file) as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip().strip("'\""))
+    except Exception:
+        pass
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -223,18 +236,20 @@ def chat(req: ChatRequest):
     return ChatResponse(thread_id=req.thread_id, reply=reply)
 
 
-# Dedicated per-client pages, e.g. /jmgcargo -- the same index.html, which
-# reads its own path and opens straight into that agent (no picker, no
-# "Switch agent"). Registered explicitly per known path, so unknown paths
-# still fall through to the static mount below.
-def _dedicated_page():
-    return FileResponse(os.path.join(_here, "static", "index.html"))
+def _demo_page():
+    return FileResponse(os.path.join(_here, "static", "demo.html"))
 
+
+app.add_api_route("/demo", _demo_page, methods=["GET"], include_in_schema=False)
+app.add_api_route("/demo/", _demo_page, methods=["GET"], include_in_schema=False)
+app.add_api_route("/restaurant", _demo_page, methods=["GET"], include_in_schema=False)
+app.add_api_route("/restaurant/", _demo_page, methods=["GET"], include_in_schema=False)
 
 for _path in domain.domain_paths():
-    app.add_api_route(f"/{_path}", _dedicated_page, methods=["GET"], include_in_schema=False)
-    app.add_api_route(f"/{_path}/", _dedicated_page, methods=["GET"], include_in_schema=False)
+    app.add_api_route(f"/{_path}", _demo_page, methods=["GET"], include_in_schema=False)
+    app.add_api_route(f"/{_path}/", _demo_page, methods=["GET"], include_in_schema=False)
 
 
-# Serve the chat UI. Keep this mounted last so /api/* above takes priority.
+# Serve static files (index.html at root is the Amverio marketing site).
+app.mount("/static", StaticFiles(directory=os.path.join(_here, "static")), name="static_dir")
 app.mount("/", StaticFiles(directory=os.path.join(_here, "static"), html=True), name="static")

@@ -1,20 +1,12 @@
 """
 Text-only test harness for the Amverio agent prototype.
 
-Run this in a terminal and talk to it like a customer/donor would over
-WhatsApp. This proves out the conversation + tool-calling logic before any
-WhatsApp or real-backend wiring happens, per the agreed "logic first" build
-order.
-
-Unlike the web demo (app.py), which serves every domain at once behind a
-picker screen, this terminal harness has no picker -- it runs as ONE
-domain per process, picked by the AMVERIO_DOMAIN environment variable
-(see domain.py for the full list of available domains).
+Run this in a terminal and talk to it like a customer would over WhatsApp / web chat.
+This tests the conversational tool-calling logic directly.
 
 Usage:
     export OPENAI_API_KEY=sk-...
-    export AMVERIO_DOMAIN=fundraising   # or omit for the restaurant default
-    pip install openai
+    pip install -r requirements.txt
     python3 chat.py
 """
 
@@ -22,6 +14,19 @@ import os
 import sys
 import json
 from datetime import datetime
+
+# Load .env file if present
+_env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if os.path.exists(_env_file):
+    try:
+        with open(_env_file) as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip().strip("'\""))
+    except Exception:
+        pass
 
 from openai import OpenAI
 

@@ -72,11 +72,11 @@ def main():
 
     run_scenario(client, "Food order for pickup", [
         "What's on the menu?",
-        "I'll get two chargrilled chicken burgers and a side of fries, for pickup. I'm Sam Lee, 07000111222.",
+        "I'll get two chargrilled chicken burgers and a side of fries, for pickup. I'm Sam Lee, 07000111222, email sam.lee@example.com.",
     ])
 
     run_scenario(client, "Delivery order (no delivery logistics exist yet)", [
-        "Can I get a fish and chips delivered? Priya Shah, 07222333444.",
+        "Can I get a fish and chips delivered? Priya Shah, 07222333444, email priya.shah@example.com.",
     ])
 
     run_scenario(client, "Off-topic question (should stay on topic)", [
@@ -100,13 +100,13 @@ def main():
     run_scenario(client, "Add items, then change mind before confirming", [
         "Hi, I'd like to order two chargrilled chicken burgers for pickup.",
         "Actually, make that one burger, and add a side of fries instead.",
-        "Yes that's right, go ahead. Sam Lee, 07099 888777.",
+        "Yes that's right, go ahead. Sam Lee, 07099 888777, sam@example.com.",
     ])
 
     run_scenario(client, "Remove an item entirely before confirming", [
-        "Can I get a soup of the day and a bramley apple crumble for pickup?",
-        "Actually scrap the crumble, just the soup please.",
-        "Yes confirm that. Priya Shah, 07222 333444.",
+        "Can I get a soup of the day and a chocolate brownie for pickup?",
+        "Actually scrap the brownie, just the soup please.",
+        "Yes confirm that. Priya Shah, 07222 333444, priya@example.com.",
     ])
 
 
