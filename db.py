@@ -341,7 +341,7 @@ def get_orders() -> list[dict]:
     conn = _get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, items, order_type, name, phone, email, status, total, payment, payment_link, email_sent_to, email_status, created_at FROM orders ORDER BY rowid DESC;" if not is_pg else "SELECT id, items, order_type, name, phone, email, status, total, payment, payment_link, email_sent_to, email_status, created_at FROM orders;")
+        cur.execute("SELECT id, items, order_type, name, phone, email, status, total, payment, payment_link, email_sent_to, email_status, created_at FROM orders ORDER BY id DESC;")
         rows = cur.fetchall()
         return [_row_to_order(r) for r in rows]
     finally:
@@ -413,7 +413,7 @@ def get_reservations() -> list[dict]:
     conn = _get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, table_id, date, time, party_size, name, phone, status, created_at FROM reservations ORDER BY rowid DESC;" if not is_pg else "SELECT id, table_id, date, time, party_size, name, phone, status, created_at FROM reservations;")
+        cur.execute("SELECT id, table_id, date, time, party_size, name, phone, status, created_at FROM reservations ORDER BY id DESC;")
         rows = cur.fetchall()
         return [_row_to_reservation(r) for r in rows]
     finally:
