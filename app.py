@@ -53,10 +53,51 @@ import db
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("amverio")
 
-MODEL = os.environ.get("AMVERIO_MODEL", "gpt-4.1")
-MAX_TOOL_HOPS = 6          # safety cap on chained tool calls per turn
-MAX_TURNS_PER_THREAD = 60  # safety cap on messages kept per thread
+# Models:
+# - PUBLIC_MODEL: used for open public demo visitors (fast, inexpensive, safe)
+# - PRO_MODEL: used for authenticated BAs / internal team (premier model, unconstrained)
+PUBLIC_MODEL = os.environ.get("AMVERIO_PUBLIC_MODEL", "gpt-4o-mini").strip()
+PRO_MODEL = os.environ.get("AMVERIO_PRO_MODEL", os.environ.get("AMVERIO_MODEL", "gpt-4o")).strip()
+
+# Limits for Public Demo
+PUBLIC_MAX_INPUT_CHARS = 500
+PUBLIC_MAX_TOOL_HOPS = 3
+PUBLIC_MAX_TURNS = 14          # 7 user turns + 7 agent replies
+PUBLIC_MAX_COMPLETION_TOKENS = 350
+PUBLIC_RATE_LIMIT_WINDOW = 600 # 10 minutes
+PUBLIC_MAX_REQUESTS_PER_WINDOW = 15
+PUBLIC_MAX_REQUESTS_PER_DAY = 50
+
+# Limits for Authenticated BA / Pro Demo
+PRO_MAX_INPUT_CHARS = 4000
+PRO_MAX_TOOL_HOPS = 6
+PRO_MAX_TURNS = 60
+PRO_MAX_COMPLETION_TOKENS = 1200
+
 THREAD_TTL_SECONDS = 60 * 60 * 6  # drop threads untouched for 6h
+
+# Public IP rate tracking: {ip: {"window": [timestamps], "day": [timestamps]}}
+_public_ip_requests: dict[str, dict[str, list[float]]] = {}
+
+
+def _check_public_rate_limit(ip: str) -> None:
+    now = time.time()
+    data = _public_ip_requests.setdefault(ip, {"window": [], "day": []})
+    data["window"] = [t for t in data["window"] if now - t < PUBLIC_RATE_LIMIT_WINDOW]
+    if len(data["window"]) >= PUBLIC_MAX_REQUESTS_PER_WINDOW:
+        retry_after = int(PUBLIC_RATE_LIMIT_WINDOW - (now - data["window"][0]))
+        raise HTTPException(
+            status_code=429,
+            detail=f"Public demo rate limit reached (15 messages / 10 min). Please try again in {max(1, retry_after)}s, or sign in as an authorized BA.",
+        )
+    data["day"] = [t for t in data["day"] if now - t < 86400]
+    if len(data["day"]) >= PUBLIC_MAX_REQUESTS_PER_DAY:
+        raise HTTPException(
+            status_code=429,
+            detail="Daily public demo message limit reached. Please contact Amverio for full access or sign in with BA credentials.",
+        )
+    data["window"].append(now)
+    data["day"].append(now)
 
 _here = os.path.dirname(os.path.abspath(__file__))
 
@@ -176,72 +217,8 @@ def new_thread(req: NewThreadRequest):
     return {"thread_id": thread_id, "domain": req.domain}
 
 
-@app.post("/api/chat", response_model=ChatResponse)
-def chat(req: ChatRequest):
-    message = (req.message or "").strip()
-    if not message:
-        raise HTTPException(status_code=400, detail="Empty message.")
-    if not req.thread_id:
-        raise HTTPException(status_code=400, detail="Missing thread_id.")
-
-    _evict_stale_threads()
-    thread = THREADS.get(req.thread_id)
-    if thread is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Unknown or expired thread_id. Start a new conversation (POST /api/new-thread with a domain).",
-        )
-    thread["last_seen"] = time.time()
-    domain_id = thread["domain"]
-    messages = thread["messages"]
-
-    client = _client()
-    messages.append({"role": "user", "content": message})
-
-    hops = 0
-    while True:
-        try:
-            response = client.chat.completions.create(
-                model=MODEL,
-                tools=_openai_tools_for(domain_id),
-                messages=messages,
-            )
-        except Exception as e:
-            log.exception("OpenAI call failed")
-            raise HTTPException(status_code=502, detail=f"Upstream model error: {e}")
-
-        msg = response.choices[0].message
-        messages.append(msg.model_dump(exclude_none=True))
-
-        if not msg.tool_calls:
-            reply = msg.content or ""
-            break
-
-        hops += 1
-        if hops > MAX_TOOL_HOPS:
-            reply = "Sorry, something went wrong putting that together. Could you try rephrasing?"
-            messages.append({"role": "assistant", "content": reply})
-            break
-
-        for call in msg.tool_calls:
-            args = json.loads(call.function.arguments or "{}")
-            result = run_tool(domain_id, call.function.name, args)
-            log.info("tool_call thread=%s domain=%s name=%s args=%s", req.thread_id, domain_id, call.function.name, args)
-            messages.append({
-                "role": "tool",
-                "tool_call_id": call.id,
-                "content": json.dumps(result),
-            })
-
-    # Trim overly long threads (keep system prompt + most recent turns).
-    if len(messages) > MAX_TURNS_PER_THREAD:
-        messages[:] = [messages[0]] + messages[-(MAX_TURNS_PER_THREAD - 1):]
-
-    return ChatResponse(thread_id=req.thread_id, reply=reply)
-
-
 # ---------------------------------------------------------------------------
-# Client Admin Portal Auth & API Endpoints
+# Client Admin / BA Portal Auth & Session Management
 # ---------------------------------------------------------------------------
 ADMIN_USERNAME = os.environ.get("AMVERIO_ADMIN_USERNAME", "admin").strip()
 ADMIN_PASSWORD = os.environ.get("AMVERIO_ADMIN_PASSWORD", "amverio2026").strip()
@@ -257,17 +234,19 @@ def _check_login_rate_limit(ip: str) -> None:
     _login_failures[ip] = attempts
 
 
-class AdminLoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class OrderStatusUpdate(BaseModel):
-    status: str
-
-
-class ReservationStatusUpdate(BaseModel):
-    status: str
+def _is_authenticated_admin(request: Request) -> bool:
+    auth = request.headers.get("authorization")
+    if auth and auth.startswith("Bearer "):
+        token = auth.split("Bearer ", 1)[1].strip()
+        if token in _admin_sessions:
+            return True
+    cookie_token = request.cookies.get("amverio_admin_token")
+    if cookie_token and cookie_token in _admin_sessions:
+        return True
+    header_token = request.headers.get("x-admin-token")
+    if header_token and header_token in _admin_sessions:
+        return True
+    return False
 
 
 def _require_admin(
@@ -286,6 +265,135 @@ def _require_admin(
     if not token or token not in _admin_sessions:
         raise HTTPException(status_code=401, detail="Unauthorized: Please log in to admin portal.")
     return token
+
+
+@app.get("/api/auth-status")
+def auth_status(request: Request):
+    is_admin = _is_authenticated_admin(request)
+    return {
+        "authenticated": is_admin,
+        "mode": "pro" if is_admin else "public",
+        "model": PRO_MODEL if is_admin else PUBLIC_MODEL,
+        "rate_limited": not is_admin,
+    }
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(req: ChatRequest, request: Request):
+    message = (req.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Empty message.")
+    if not req.thread_id:
+        raise HTTPException(status_code=400, detail="Missing thread_id.")
+
+    is_pro = _is_authenticated_admin(request)
+    client_ip = (
+        request.headers.get("cf-connecting-ip")
+        or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
+
+    if not is_pro:
+        # Public visitor guardrails
+        if len(message) > PUBLIC_MAX_INPUT_CHARS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Message too long for public demo (max {PUBLIC_MAX_INPUT_CHARS} characters). Please keep prompts concise.",
+            )
+        _check_public_rate_limit(client_ip)
+    else:
+        # BA / Admin unrestricted mode
+        if len(message) > PRO_MAX_INPUT_CHARS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Message exceeds maximum character length ({PRO_MAX_INPUT_CHARS}).",
+            )
+
+    _evict_stale_threads()
+    thread = THREADS.get(req.thread_id)
+    if thread is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Unknown or expired thread_id. Start a new conversation (POST /api/new-thread with a domain).",
+        )
+    thread["last_seen"] = time.time()
+    domain_id = thread["domain"]
+    messages = thread["messages"]
+
+    # Public turn ceiling
+    if not is_pro and len(messages) >= PUBLIC_MAX_TURNS:
+        return ChatResponse(
+            thread_id=req.thread_id,
+            reply=(
+                "You have reached the message limit for this public demo session. "
+                "Please click **'New order'** above to start a fresh conversation, "
+                "or sign in with authorized BA credentials for unlimited live demos."
+            ),
+        )
+
+    # Dynamic tier selection
+    selected_model = PRO_MODEL if is_pro else PUBLIC_MODEL
+    max_hops = PRO_MAX_TOOL_HOPS if is_pro else PUBLIC_MAX_TOOL_HOPS
+    max_tokens = PRO_MAX_COMPLETION_TOKENS if is_pro else PUBLIC_MAX_COMPLETION_TOKENS
+    max_turns_retained = PRO_MAX_TURNS if is_pro else PUBLIC_MAX_TURNS
+
+    client = _client()
+    messages.append({"role": "user", "content": message})
+
+    hops = 0
+    while True:
+        try:
+            response = client.chat.completions.create(
+                model=selected_model,
+                tools=_openai_tools_for(domain_id),
+                messages=messages,
+                max_tokens=max_tokens,
+            )
+        except Exception as e:
+            log.exception("OpenAI call failed (model=%s, is_pro=%s)", selected_model, is_pro)
+            raise HTTPException(status_code=502, detail=f"Upstream model error: {e}")
+
+        msg = response.choices[0].message
+        messages.append(msg.model_dump(exclude_none=True))
+
+        if not msg.tool_calls:
+            reply = msg.content or ""
+            break
+
+        hops += 1
+        if hops > max_hops:
+            reply = "I've gathered what I can, but reached the tool execution limit for this step. Could you clarify what you'd like to do next?"
+            messages.append({"role": "assistant", "content": reply})
+            break
+
+        for call in msg.tool_calls:
+            args = json.loads(call.function.arguments or "{}")
+            result = run_tool(domain_id, call.function.name, args)
+            log.info("tool_call thread=%s domain=%s name=%s args=%s (pro=%s)", req.thread_id, domain_id, call.function.name, args, is_pro)
+            messages.append({
+                "role": "tool",
+                "tool_call_id": call.id,
+                "content": json.dumps(result),
+            })
+
+    # Trim overly long threads
+    if len(messages) > max_turns_retained:
+        messages[:] = [messages[0]] + messages[-(max_turns_retained - 1):]
+
+    return ChatResponse(thread_id=req.thread_id, reply=reply)
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str
+
+
+class ReservationStatusUpdate(BaseModel):
+    status: str
 
 
 @app.post("/api/admin/login")
@@ -476,6 +584,8 @@ app.add_api_route("/demo", _demo_page, methods=["GET", "HEAD"], include_in_schem
 app.add_api_route("/demo/", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
 app.add_api_route("/restaurant", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
 app.add_api_route("/restaurant/", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
+app.add_api_route("/client-demo", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
+app.add_api_route("/client-demo/", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)
 
 for _path in domain.domain_paths():
     app.add_api_route(f"/{_path}", _demo_page, methods=["GET", "HEAD"], include_in_schema=False)

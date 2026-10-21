@@ -275,6 +275,22 @@ def _create_stripe_payment_link(order_id: str, line_items: list, total: float, c
         return f"https://checkout.stripe.com/c/pay/cs_test_demo_{order_id.lower()}#order={order_id}"
 
 
+_sent_emails_history: dict[str, list[float]] = {}
+
+
+def _is_email_throttled(email: str) -> bool:
+    clean = (email or "").strip().lower()
+    if not clean:
+        return True
+    now = time.time()
+    recent = [t for t in _sent_emails_history.get(clean, []) if now - t < 3600]
+    _sent_emails_history[clean] = recent
+    if len(recent) >= 3:
+        return True
+    recent.append(now)
+    return False
+
+
 def _send_brevo_confirmation_email(
     order_id: str,
     customer_name: str,
@@ -288,6 +304,10 @@ def _send_brevo_confirmation_email(
     Sends an order confirmation email via Brevo SMTP relay or REST API.
     Falls back gracefully if credentials are missing or send fails.
     """
+    if _is_email_throttled(customer_email):
+        print(f"Brevo email throttled for {customer_email} (max 3/hr per address)")
+        return {"ok": True, "throttled": True, "detail": "Email dispatch throttled for demo."}
+
     smtp_host = os.environ.get("SMTP_HOST", "smtp-relay.brevo.com").strip()
     smtp_port_val = os.environ.get("SMTP_PORT", "587").strip()
     smtp_port = int(smtp_port_val) if smtp_port_val.isdigit() else 587

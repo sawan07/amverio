@@ -373,6 +373,157 @@
   }
   .switch-agent:active{opacity:0.7}
 
+  .ba-badge-btn {
+    flex-shrink: 0;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--line);
+    border-radius: var(--btn-radius, 999px);
+    padding: 7px 11px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+  .ba-badge-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0, 242, 254, 0.08);
+  }
+  .ba-badge-btn.pro-active {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.16) 0%, rgba(2, 132, 199, 0.16) 100%);
+    border-color: #10b981;
+    color: #10b981;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.3);
+  }
+  .ba-mode-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .ba-badge-btn.pro-active .ba-mode-dot {
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+    animation: pulseDot 2s infinite;
+  }
+
+  /* BA Unlock Modal */
+  .ba-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(5, 8, 17, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 1000;
+  }
+  .ba-modal-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  }
+  .ba-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .ba-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--fg);
+  }
+  .ba-close-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+  }
+  .ba-close-btn:hover { color: var(--fg); }
+  .ba-modal-desc {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 0 0 16px 0;
+  }
+  .ba-error-msg {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #f87171;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    margin-bottom: 14px;
+  }
+  .ba-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .ba-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+  }
+  .ba-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .ba-field input {
+    font-family: inherit;
+    font-size: 14px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--fg);
+    outline: none;
+  }
+  .ba-field input:focus {
+    border-color: var(--accent);
+  }
+  .ba-submit-btn {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px;
+    border-radius: 999px;
+    border: none;
+    background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+    color: #ffffff;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+    margin-top: 6px;
+    transition: all 0.2s ease;
+  }
+  .ba-submit-btn:hover {
+    box-shadow: 0 6px 18px rgba(2, 132, 199, 0.5);
+    transform: translateY(-1px);
+  }
+
   @media (max-width: 640px) {
     header {
       padding: 10px 14px;
@@ -381,9 +532,9 @@
     .brand .tag {
       display: none;
     }
-    .switch-agent, button.new-order {
+    .switch-agent, button.new-order, .ba-badge-btn {
       padding: 6px 10px;
-      font-size: 12px;
+      font-size: 11.5px;
     }
   }
 
@@ -828,6 +979,10 @@
               </span>
             </span>
           </button>
+          <button type="button" class="ba-badge-btn" id="baModeBtn" title="BA Staff Live Demo Access">
+            <span class="ba-mode-dot"></span>
+            <span id="baModeText">BA Unlock 🔑</span>
+          </button>
           <a href="/" class="switch-agent" id="switchAgentBtn">← Amverio Site</a>
           <a href="/admin" class="switch-agent">Admin Portal ↗</a>
           <button class="new-order" id="newOrderBtn" type="button">New order</button>
@@ -855,6 +1010,34 @@
 
   </div>
 
+  <!-- BA Live Demo Unlock Modal -->
+  <div class="ba-modal-overlay" id="baModal" style="display:none;">
+    <div class="ba-modal-card">
+      <div class="ba-modal-header">
+        <div class="ba-modal-title">
+          <span style="font-size:18px; color:var(--accent);">✦</span>
+          <span>BA Live Demo Unlock</span>
+        </div>
+        <button type="button" class="ba-close-btn" id="closeBaModalBtn" aria-label="Close">✕</button>
+      </div>
+      <p class="ba-modal-desc">
+        Sign in with authorized Amverio credentials to activate <strong>unrestricted GPT-4o live demo mode</strong> with zero rate limits for client presentations.
+      </p>
+      <div class="ba-error-msg" id="baErrorMsg" style="display:none;"></div>
+      <form id="baLoginForm" class="ba-form">
+        <div class="ba-field">
+          <label for="baUsername">BA Username</label>
+          <input type="text" id="baUsername" required autocomplete="username" placeholder="Username">
+        </div>
+        <div class="ba-field">
+          <label for="baPassword">BA Password</label>
+          <input type="password" id="baPassword" required autocomplete="current-password" placeholder="••••••••••••">
+        </div>
+        <button type="submit" class="ba-submit-btn" id="submitBaLoginBtn">Unlock Full Pro Mode</button>
+      </form>
+    </div>
+  </div>
+
 <script>
 (function(){
   const pickerEl = document.getElementById('picker');
@@ -874,6 +1057,9 @@
   const topBarEl = document.getElementById('topBar');
   const rootEl = document.documentElement;
   let appliedVars = [];
+  let currentAdminToken = localStorage.getItem('amverio_admin_token') || '';
+  let isProMode = false;
+  let activeModelName = 'gpt-4o-mini';
 
   // Per-agent branding. Inline vars on <html> override the default palette; clearTheme() puts it back.
   function applyTheme(theme){
@@ -1029,13 +1215,15 @@
   function renderWelcomeCard(cfg){
     const card = document.createElement('div');
     card.className = 'hero-welcome-card';
+    const statusLabel = isProMode ? 'BA Mode Active' : 'Public Demo Online';
+    const badgeLabel = isProMode ? 'GPT-4o Pro (Unlimited)' : 'GPT-4o-mini (Protected)';
     card.innerHTML = `
       <div class="welcome-header">
         <div class="status-indicator">
           <span class="status-dot"></span>
-          <span>DineSync AI Online</span>
+          <span>${statusLabel}</span>
         </div>
-        <span class="model-badge">Amverio Agent</span>
+        <span class="model-badge">${badgeLabel}</span>
       </div>
       <h3 class="welcome-heading">${escapeHtml(cfg.brand_name || 'The Copper Fork')}</h3>
       <p class="welcome-sub">I'm your 24/7 restaurant assistant. Ask for menus, place food delivery orders with Stripe payment, or reserve a table instantly.</p>
@@ -1186,9 +1374,13 @@
     addRow('user', text);
     addTyping();
     try {
+      const headers = {'Content-Type': 'application/json'};
+      if (currentAdminToken) {
+        headers['Authorization'] = 'Bearer ' + currentAdminToken;
+      }
       const resp = await fetch('/api/chat', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: JSON.stringify({thread_id: threadId, message: text})
       });
       removeTyping();
@@ -1269,7 +1461,138 @@
     });
   }
 
-  loadDomains();
+  const baModeBtn = document.getElementById('baModeBtn');
+  const baModal = document.getElementById('baModal');
+  const closeBaModalBtn = document.getElementById('closeBaModalBtn');
+  const baLoginForm = document.getElementById('baLoginForm');
+  const baErrorMsg = document.getElementById('baErrorMsg');
+  const submitBaLoginBtn = document.getElementById('submitBaLoginBtn');
+
+  async function checkAuthStatus() {
+    try {
+      const headers = {};
+      if (currentAdminToken) headers['Authorization'] = 'Bearer ' + currentAdminToken;
+      const resp = await fetch('/api/auth-status', { headers });
+      if (resp.ok) {
+        const data = await resp.json();
+        isProMode = !!data.authenticated;
+        activeModelName = data.model || (isProMode ? 'gpt-4o' : 'gpt-4o-mini');
+        updateBaModeUI();
+        return isProMode;
+      }
+    } catch(e) {}
+    isProMode = false;
+    activeModelName = 'gpt-4o-mini';
+    updateBaModeUI();
+    return false;
+  }
+
+  function updateBaModeUI() {
+    const text = document.getElementById('baModeText');
+    if (!baModeBtn || !text) return;
+    if (isProMode) {
+      baModeBtn.classList.add('pro-active');
+      text.textContent = '✦ BA Mode (' + activeModelName + ')';
+      baModeBtn.title = 'Authorized BA Demo Active: Unrestricted ' + activeModelName + '. Click to sign out.';
+    } else {
+      baModeBtn.classList.remove('pro-active');
+      text.textContent = 'BA Unlock 🔑';
+      baModeBtn.title = 'Click to sign in with BA credentials and unlock unrestricted GPT-4o mode';
+    }
+    const welcomeCard = document.querySelector('.hero-welcome-card');
+    if (welcomeCard) {
+      const statusDotSpan = welcomeCard.querySelector('.status-indicator span:last-child');
+      const modelBadge = welcomeCard.querySelector('.model-badge');
+      if (statusDotSpan) statusDotSpan.textContent = isProMode ? 'BA Mode Active' : 'Public Demo Online';
+      if (modelBadge) modelBadge.textContent = isProMode ? 'GPT-4o Pro (Unlimited)' : 'GPT-4o-mini (Protected)';
+    }
+  }
+
+  if (baModeBtn) {
+    baModeBtn.addEventListener('click', function() {
+      if (isProMode) {
+        if (confirm("You are currently in BA Live Demo Mode (Unrestricted " + activeModelName + "). Sign out and return to Public Demo Mode?")) {
+          currentAdminToken = '';
+          localStorage.removeItem('amverio_admin_token');
+          fetch('/api/admin/logout', { method: 'POST' }).catch(()=>{});
+          isProMode = false;
+          activeModelName = 'gpt-4o-mini';
+          updateBaModeUI();
+          startNewThread(true);
+        }
+      } else {
+        if (baErrorMsg) baErrorMsg.style.display = 'none';
+        if (baModal) baModal.style.display = 'flex';
+        const userInp = document.getElementById('baUsername');
+        if (userInp) userInp.focus();
+      }
+    });
+  }
+
+  if (closeBaModalBtn) {
+    closeBaModalBtn.addEventListener('click', function() {
+      if (baModal) baModal.style.display = 'none';
+    });
+  }
+
+  if (baModal) {
+    baModal.addEventListener('click', function(e) {
+      if (e.target === baModal) {
+        baModal.style.display = 'none';
+      }
+    });
+  }
+
+  if (baLoginForm) {
+    baLoginForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      if (baErrorMsg) baErrorMsg.style.display = 'none';
+      submitBaLoginBtn.disabled = true;
+      submitBaLoginBtn.textContent = 'Verifying…';
+
+      const username = document.getElementById('baUsername').value.trim();
+      const password = document.getElementById('baPassword').value.trim();
+
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          currentAdminToken = data.token;
+          localStorage.setItem('amverio_admin_token', data.token);
+          if (baModal) baModal.style.display = 'none';
+          await checkAuthStatus();
+          startNewThread(true);
+        } else {
+          if (baErrorMsg) {
+            baErrorMsg.textContent = data.detail || 'Invalid username or password.';
+            baErrorMsg.style.display = 'block';
+          }
+        }
+      } catch (err) {
+        if (baErrorMsg) {
+          baErrorMsg.textContent = 'Connection error. Please try again.';
+          baErrorMsg.style.display = 'block';
+        }
+      } finally {
+        submitBaLoginBtn.disabled = false;
+        submitBaLoginBtn.textContent = 'Unlock Full Pro Mode';
+      }
+    });
+  }
+
+  (async function init() {
+    const isAuthed = await checkAuthStatus();
+    if (window.location.pathname.includes('client-demo')) {
+      if (!isAuthed && baModal) {
+        baModal.style.display = 'flex';
+      }
+    }
+    await loadDomains();
+  })();
 })();
 </script>
 </body>
