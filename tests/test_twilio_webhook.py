@@ -230,6 +230,16 @@ class TestTwilioWhatsAppWebhook(unittest.TestCase):
             f"Unexpected reply content: {full_reply}"
         )
 
+    def test_whatsapp_formatting_adapter(self):
+        """Verify markdown formatting is adapted for WhatsApp (e.g. **bold** -> *bold*)."""
+        from app import _format_for_whatsapp
+        raw = "Here is **bold text** and [Link Name](https://example.com) with ### Header Title"
+        formatted = _format_for_whatsapp(raw)
+        self.assertIn("*bold text*", formatted)
+        self.assertNotIn("**bold text**", formatted)
+        self.assertIn("Link Name: https://example.com", formatted)
+        self.assertIn("*Header Title*", formatted)
+
 
 if __name__ == "__main__":
     unittest.main()

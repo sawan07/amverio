@@ -19,6 +19,7 @@ not for production traffic.
 """
 
 import os
+import re
 import json
 import time
 import uuid
@@ -585,6 +586,24 @@ def _evict_stale_message_sids() -> None:
         _processed_message_sids.pop(sid, None)
 
 
+def _format_for_whatsapp(text: str) -> str:
+    """
+    Adapts standard Markdown text to WhatsApp-native formatting:
+    - Markdown bold **bold** -> *bold* (WhatsApp uses single asterisks for bold)
+    - Markdown headers ### Header -> *Header*
+    - Markdown links [Label](url) -> Label: url
+    """
+    if not text:
+        return ""
+    # Convert markdown links [Label](URL) -> Label: URL
+    formatted = re.sub(r"\[([^\]]+)\]\((https?://[^\)]+)\)", r"\1: \2", text)
+    # Convert markdown headers: ### Title -> *Title*
+    formatted = re.sub(r"(?:^|(?<=\n)|(?<=\s))#{1,6}\s*(.+?)(?=\n|$)", r"*\1*", formatted)
+    # Convert **bold** -> *bold*
+    formatted = re.sub(r"\*\*(.+?)\*\*", r"*\1*", formatted)
+    return formatted.strip()
+
+
 def _split_whatsapp_message(text: str, max_length: int = 1500) -> list[str]:
     """
     Splits replies longer than max_length into conversational chunks,
@@ -708,7 +727,8 @@ async def twilio_whatsapp_webhook(request: Request):
         log.exception("Error generating agent reply for %s: %s", session_id, e)
         reply_text = "I'm having a little trouble right now. Please give us a call at the restaurant or try again shortly."
 
-    # 5. Split replies > 1600 chars into multiple TwiML messages
+    # 5. Format for WhatsApp readability (*bold*, links) & split replies > 1600 chars
+    reply_text = _format_for_whatsapp(reply_text)
     chunks = _split_whatsapp_message(reply_text, max_length=1500)
     for chunk in chunks:
         resp.message(chunk)
