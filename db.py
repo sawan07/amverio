@@ -91,7 +91,19 @@ def init_db() -> None:
                 name VARCHAR(255) NOT NULL,
                 phone VARCHAR(64) NOT NULL,
                 status VARCHAR(64) NOT NULL,
-                created_at VARCHAR(64) NOT NULL
+                created_at VARCHAR(64) NOT NULL,
+                reminder_sent_at VARCHAR(64)
+            );
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+                phone_number VARCHAR(64) PRIMARY KEY,
+                last_inbound_at DOUBLE PRECISION NOT NULL,
+                last_message_text TEXT,
+                last_outbound_at DOUBLE PRECISION,
+                created_at VARCHAR(64) NOT NULL,
+                updated_at VARCHAR(64) NOT NULL
             );
             """)
         else:
@@ -123,10 +135,35 @@ def init_db() -> None:
                 name TEXT NOT NULL,
                 phone TEXT NOT NULL,
                 status TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                reminder_sent_at TEXT
+            );
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+                phone_number TEXT PRIMARY KEY,
+                last_inbound_at REAL NOT NULL,
+                last_message_text TEXT,
+                last_outbound_at REAL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             );
             """)
             conn.commit()
+
+        # Schema migrations for existing tables
+        try:
+            if is_pg:
+                cur.execute("ALTER TABLE reservations ADD COLUMN IF NOT EXISTS reminder_sent_at VARCHAR(64);")
+            else:
+                cur.execute("PRAGMA table_info(reservations);")
+                columns = [row[1] for row in cur.fetchall()]
+                if "reminder_sent_at" not in columns:
+                    cur.execute("ALTER TABLE reservations ADD COLUMN reminder_sent_at TEXT;")
+                    conn.commit()
+        except Exception as e:
+            log.warning("Could not add reminder_sent_at column to reservations: %s", e)
 
         # Check if orders need seeding
         cur.execute("SELECT COUNT(*) FROM orders;")
@@ -328,7 +365,7 @@ def _row_to_reservation(row: Any) -> dict:
         try:
             d = dict(row)
         except Exception:
-            cols = ["id", "table_id", "date", "time", "party_size", "name", "phone", "status", "created_at"]
+            cols = ["id", "table_id", "date", "time", "party_size", "name", "phone", "status", "created_at", "reminder_sent_at"]
             d = dict(zip(cols, row))
     if d.get("party_size") is not None:
         d["party_size"] = int(d["party_size"])
@@ -428,9 +465,24 @@ def get_reservations() -> list[dict]:
     conn = _get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, table_id, date, time, party_size, name, phone, status, created_at FROM reservations ORDER BY id DESC;")
+        cur.execute("SELECT id, table_id, date, time, party_size, name, phone, status, created_at, reminder_sent_at FROM reservations ORDER BY id DESC;")
         rows = cur.fetchall()
         return [_row_to_reservation(r) for r in rows]
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_reservation(res_id: str) -> Optional[dict]:
+    """Retrieve a single reservation by ID."""
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    try:
+        sql = "SELECT id, table_id, date, time, party_size, name, phone, status, created_at, reminder_sent_at FROM reservations WHERE id = %s;" if is_pg else "SELECT id, table_id, date, time, party_size, name, phone, status, created_at, reminder_sent_at FROM reservations WHERE id = ?;"
+        cur.execute(sql, (res_id,))
+        row = cur.fetchone()
+        return _row_to_reservation(row) if row else None
     finally:
         cur.close()
         conn.close()
@@ -443,11 +495,11 @@ def add_reservation(res: dict) -> dict:
     cur = conn.cursor()
     try:
         sql = """
-        INSERT INTO reservations (id, table_id, date, time, party_size, name, phone, status, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO reservations (id, table_id, date, time, party_size, name, phone, status, created_at, reminder_sent_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """ if is_pg else """
-        INSERT INTO reservations (id, table_id, date, time, party_size, name, phone, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO reservations (id, table_id, date, time, party_size, name, phone, status, created_at, reminder_sent_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         cur.execute(sql, (
             res["id"],
@@ -459,6 +511,7 @@ def add_reservation(res: dict) -> dict:
             res["phone"],
             res["status"],
             res.get("created_at", datetime.now().strftime("%Y-%m-%d %H:%M")),
+            res.get("reminder_sent_at"),
         ))
         if not is_pg:
             conn.commit()
@@ -479,13 +532,186 @@ def update_reservation_status(res_id: str, status: str) -> Optional[dict]:
         if not is_pg:
             conn.commit()
         
-        sel_sql = "SELECT id, table_id, date, time, party_size, name, phone, status, created_at FROM reservations WHERE id = %s;" if is_pg else "SELECT id, table_id, date, time, party_size, name, phone, status, created_at FROM reservations WHERE id = ?;"
+        sel_sql = "SELECT id, table_id, date, time, party_size, name, phone, status, created_at, reminder_sent_at FROM reservations WHERE id = %s;" if is_pg else "SELECT id, table_id, date, time, party_size, name, phone, status, created_at, reminder_sent_at FROM reservations WHERE id = ?;"
         cur.execute(sel_sql, (res_id,))
         row = cur.fetchone()
         return _row_to_reservation(row) if row else None
     finally:
         cur.close()
         conn.close()
+
+
+def mark_reservation_reminder_sent(res_id: str, sent_at: Optional[str] = None) -> Optional[dict]:
+    """Marks that a booking reminder has been sent for this reservation."""
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    timestamp = sent_at or datetime.now().isoformat()
+    try:
+        sql = "UPDATE reservations SET reminder_sent_at = %s WHERE id = %s;" if is_pg else "UPDATE reservations SET reminder_sent_at = ? WHERE id = ?;"
+        cur.execute(sql, (timestamp, res_id))
+        if not is_pg:
+            conn.commit()
+        return get_reservation(res_id)
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_due_reminders(hours_ahead: float = 3.0, reference_dt: Optional[datetime] = None) -> list[dict]:
+    """
+    Finds CONFIRMED reservations that have not received a reminder yet (reminder_sent_at IS NULL),
+    and whose scheduled date/time is within `hours_ahead` hours from reference_dt (defaulting to now).
+    """
+    now = reference_dt or datetime.now()
+    window_end = now + timedelta(hours=hours_ahead)
+    
+    all_res = get_reservations()
+    due = []
+    for r in all_res:
+        if r.get("status") != "CONFIRMED":
+            continue
+        if r.get("reminder_sent_at"):
+            continue
+        
+        date_str = r.get("date", "").strip()
+        time_str = r.get("time", "").strip()
+        if not date_str or not time_str:
+            continue
+        
+        try:
+            res_dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        except ValueError:
+            continue
+        
+        if now <= res_dt <= window_end:
+            due.append(r)
+    return due
+
+
+# ---------------------------------------------------------------------------
+# WhatsApp Session & 24-Hour Window Persistence Layer
+# ---------------------------------------------------------------------------
+
+def _row_to_session(row: Any) -> dict:
+    if isinstance(row, dict):
+        d = dict(row)
+    else:
+        try:
+            d = dict(row)
+        except Exception:
+            cols = ["phone_number", "last_inbound_at", "last_message_text", "last_outbound_at", "created_at", "updated_at"]
+            d = dict(zip(cols, row))
+    if d.get("last_inbound_at") is not None:
+        d["last_inbound_at"] = float(d["last_inbound_at"])
+    if d.get("last_outbound_at") is not None:
+        d["last_outbound_at"] = float(d["last_outbound_at"])
+    return d
+
+
+def record_whatsapp_inbound(phone_number: str, message_text: str = "", timestamp: Optional[float] = None) -> dict:
+    """
+    Records or updates an inbound WhatsApp message timestamp for a phone number.
+    Ensures 24-hour customer window is tracked accurately.
+    """
+    import time
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    now_ts = timestamp if timestamp is not None else time.time()
+    now_iso = datetime.now().isoformat()
+    phone = phone_number.strip()
+    
+    try:
+        cur.execute("SELECT phone_number FROM whatsapp_sessions WHERE phone_number = %s;" if is_pg else "SELECT phone_number FROM whatsapp_sessions WHERE phone_number = ?;", (phone,))
+        existing = cur.fetchone()
+        if existing:
+            sql = """
+            UPDATE whatsapp_sessions
+            SET last_inbound_at = %s, last_message_text = %s, updated_at = %s
+            WHERE phone_number = %s;
+            """ if is_pg else """
+            UPDATE whatsapp_sessions
+            SET last_inbound_at = ?, last_message_text = ?, updated_at = ?
+            WHERE phone_number = ?;
+            """
+            cur.execute(sql, (now_ts, message_text, now_iso, phone))
+        else:
+            sql = """
+            INSERT INTO whatsapp_sessions (phone_number, last_inbound_at, last_message_text, last_outbound_at, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s);
+            """ if is_pg else """
+            INSERT INTO whatsapp_sessions (phone_number, last_inbound_at, last_message_text, last_outbound_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?);
+            """
+            cur.execute(sql, (phone, now_ts, message_text, None, now_iso, now_iso))
+        if not is_pg:
+            conn.commit()
+
+        cur.execute("SELECT phone_number, last_inbound_at, last_message_text, last_outbound_at, created_at, updated_at FROM whatsapp_sessions WHERE phone_number = %s;" if is_pg else "SELECT phone_number, last_inbound_at, last_message_text, last_outbound_at, created_at, updated_at FROM whatsapp_sessions WHERE phone_number = ?;", (phone,))
+        row = cur.fetchone()
+        return _row_to_session(row) if row else {}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def record_whatsapp_outbound(phone_number: str, timestamp: Optional[float] = None) -> None:
+    """Updates last_outbound_at timestamp for a session."""
+    import time
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    now_ts = timestamp if timestamp is not None else time.time()
+    now_iso = datetime.now().isoformat()
+    phone = phone_number.strip()
+    try:
+        sql = "UPDATE whatsapp_sessions SET last_outbound_at = %s, updated_at = %s WHERE phone_number = %s;" if is_pg else "UPDATE whatsapp_sessions SET last_outbound_at = ?, updated_at = ? WHERE phone_number = ?;"
+        cur.execute(sql, (now_ts, now_iso, phone))
+        if not is_pg:
+            conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_whatsapp_session(phone_number: str) -> Optional[dict]:
+    """Retrieve WhatsApp session record by phone number."""
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    phone = phone_number.strip()
+    candidates = [phone]
+    if phone.startswith("whatsapp:"):
+        candidates.append(phone[len("whatsapp:"):])
+    else:
+        candidates.append(f"whatsapp:{phone}")
+
+    try:
+        for c in candidates:
+            sql = "SELECT phone_number, last_inbound_at, last_message_text, last_outbound_at, created_at, updated_at FROM whatsapp_sessions WHERE phone_number = %s;" if is_pg else "SELECT phone_number, last_inbound_at, last_message_text, last_outbound_at, created_at, updated_at FROM whatsapp_sessions WHERE phone_number = ?;"
+            cur.execute(sql, (c,))
+            row = cur.fetchone()
+            if row:
+                return _row_to_session(row)
+        return None
+    finally:
+        cur.close()
+        conn.close()
+
+
+def is_inside_24h_window(phone_number: str, now_ts: Optional[float] = None) -> bool:
+    """
+    Returns True if the customer sent an inbound message within the last 24 hours.
+    Otherwise False (meaning a pre-approved template is required).
+    """
+    import time
+    sess = get_whatsapp_session(phone_number)
+    if not sess or not sess.get("last_inbound_at"):
+        return False
+    current_time = now_ts if now_ts is not None else time.time()
+    elapsed = current_time - sess["last_inbound_at"]
+    return 0 <= elapsed <= (24 * 3600)
 
 
 def get_next_order_id() -> str:

@@ -710,6 +710,13 @@ async def twilio_whatsapp_webhook(request: Request):
             return Response(content=str(resp), media_type="application/xml")
         _processed_message_sids[message_sid] = time.time()
 
+    # Track 24-hour customer window in database
+    if from_number:
+        try:
+            db.record_whatsapp_inbound(from_number, body)
+        except Exception as e:
+            log.warning("Could not record WhatsApp inbound timestamp for %s: %s", from_number, e)
+
     # 3. Handle empty / media-only messages politely
     resp = MessagingResponse()
     if not body:
@@ -734,6 +741,50 @@ async def twilio_whatsapp_webhook(request: Request):
         resp.message(chunk)
 
     return Response(content=str(resp), media_type="application/xml")
+
+
+@app.get("/api/whatsapp/sessions/{phone}")
+def get_whatsapp_session_status(phone: str, request: Request):
+    """Inspect WhatsApp session and 24-hour service window status."""
+    sess = db.get_whatsapp_session(phone)
+    inside_24h = db.is_inside_24h_window(phone)
+    if not sess:
+        return {
+            "phone": phone,
+            "exists": False,
+            "inside_24h_window": False,
+            "detail": "No inbound messages recorded from this number.",
+        }
+    return {
+        "phone": phone,
+        "exists": True,
+        "inside_24h_window": inside_24h,
+        "last_inbound_at": sess.get("last_inbound_at"),
+        "last_outbound_at": sess.get("last_outbound_at"),
+        "created_at": sess.get("created_at"),
+        "updated_at": sess.get("updated_at"),
+    }
+
+
+@app.post("/api/reminders/run")
+def trigger_booking_reminders(
+    hours: float = 3.0,
+    dry_run: bool = False,
+    request: Request = None,
+):
+    """
+    Manually trigger or schedule the booking reminder job.
+    Requires BA/Admin authorization.
+    """
+    if not _is_authenticated_admin(request):
+        raise HTTPException(status_code=401, detail="Unauthorized: Admin access required.")
+    import reminder_job
+    results = reminder_job.run_booking_reminders(hours_ahead=hours, dry_run=dry_run)
+    return {
+        "status": "success",
+        "processed_count": len(results),
+        "results": results,
+    }
 
 
 def _admin_page():
