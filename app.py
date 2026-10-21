@@ -22,6 +22,7 @@ import os
 import json
 import time
 import uuid
+import secrets
 import logging
 from datetime import datetime
 
@@ -242,9 +243,18 @@ def chat(req: ChatRequest):
 # ---------------------------------------------------------------------------
 # Client Admin Portal Auth & API Endpoints
 # ---------------------------------------------------------------------------
-ADMIN_USERNAME = os.environ.get("AMVERIO_ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.environ.get("AMVERIO_ADMIN_PASSWORD", "amverio2026")
+ADMIN_USERNAME = os.environ.get("AMVERIO_ADMIN_USERNAME", "admin").strip()
+ADMIN_PASSWORD = os.environ.get("AMVERIO_ADMIN_PASSWORD", "amverio2026").strip()
 _admin_sessions: set[str] = set()
+_login_failures: dict[str, list[float]] = {}
+
+
+def _check_login_rate_limit(ip: str) -> None:
+    now = time.time()
+    attempts = [t for t in _login_failures.get(ip, []) if now - t < 300]
+    if len(attempts) >= 5:
+        raise HTTPException(status_code=429, detail="Too many failed login attempts. Please wait 5 minutes.")
+    _login_failures[ip] = attempts
 
 
 class AdminLoginRequest(BaseModel):
@@ -279,18 +289,38 @@ def _require_admin(
 
 
 @app.post("/api/admin/login")
-def admin_login(req: AdminLoginRequest, response: Response):
-    if req.username == ADMIN_USERNAME and req.password == ADMIN_PASSWORD:
+def admin_login(req: AdminLoginRequest, request: Request, response: Response):
+    client_ip = (
+        request.headers.get("cf-connecting-ip")
+        or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
+    _check_login_rate_limit(client_ip)
+
+    user_input = (req.username or "").strip()
+    pass_input = (req.password or "").strip()
+
+    valid_user = bool(ADMIN_USERNAME) and secrets.compare_digest(user_input, ADMIN_USERNAME)
+    valid_pass = bool(ADMIN_PASSWORD) and secrets.compare_digest(pass_input, ADMIN_PASSWORD)
+
+    if valid_user and valid_pass:
+        _login_failures.pop(client_ip, None)
         token = str(uuid.uuid4())
         _admin_sessions.add(token)
         response.set_cookie(
             key="amverio_admin_token",
             value=token,
-            httponly=False,
+            httponly=True,
+            secure=True,
             samesite="lax",
             max_age=86400 * 7,
         )
-        return {"ok": True, "token": token, "username": req.username}
+        return {"ok": True, "token": token, "username": user_input}
+
+    now = time.time()
+    attempts = [t for t in _login_failures.get(client_ip, []) if now - t < 300]
+    attempts.append(now)
+    _login_failures[client_ip] = attempts
     raise HTTPException(status_code=401, detail="Invalid username or password.")
 
 

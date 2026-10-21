@@ -1121,16 +1121,11 @@
       <form class="login-form" id="loginForm">
         <div class="form-group">
           <label for="loginUsername">Username</label>
-          <input type="text" id="loginUsername" required autocomplete="username" value="admin">
+          <input type="text" id="loginUsername" required autocomplete="username" placeholder="Admin username">
         </div>
         <div class="form-group">
           <label for="loginPassword">Password</label>
-          <input type="password" id="loginPassword" required autocomplete="current-password" value="amverio2026">
-        </div>
-
-        <div class="demo-hint-box">
-          <span>Demo Access: <strong>admin</strong> / <strong>amverio2026</strong></span>
-          <button type="button" class="fill-btn" id="fillDemoBtn">Auto-fill</button>
+          <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••••••">
         </div>
 
         <button type="submit" class="login-btn" id="submitLoginBtn">Sign In</button>
@@ -1156,7 +1151,6 @@
       const loginForm = document.getElementById('loginForm');
       const loginErrorMsg = document.getElementById('loginErrorMsg');
       const submitLoginBtn = document.getElementById('submitLoginBtn');
-      const fillDemoBtn = document.getElementById('fillDemoBtn');
       const logoutBtn = document.getElementById('logoutBtn');
       const refreshBtn = document.getElementById('refreshBtn');
       const refreshIcon = document.getElementById('refreshIcon');
@@ -1209,11 +1203,6 @@
         return false;
       }
 
-      // Fill demo button
-      fillDemoBtn.addEventListener('click', () => {
-        document.getElementById('loginUsername').value = 'admin';
-        document.getElementById('loginPassword').value = 'amverio2026';
-      });
 
       // Login form submit
       loginForm.addEventListener('submit', async (e) => {
