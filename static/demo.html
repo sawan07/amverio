@@ -6,7 +6,7 @@
 <title>DineSync — Amverio Restaurant Assistant Demo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- Immediate Theme Initialization -->
 <script>
   (function() {
@@ -70,18 +70,54 @@
     margin:0;
     background:var(--bg);
     color:var(--fg);
-    font-family:var(--font, 'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif);
+    font-family:var(--font, 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
     display:flex;
     flex-direction:column;
+    position:relative;
+    overflow:hidden;
+  }
+  .ambient-glow {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    filter: blur(120px);
+    opacity: 0.16;
+  }
+  .glow-1 {
+    width: 650px;
+    height: 650px;
+    background: radial-gradient(circle, #00f2fe, #0066ff);
+    top: -180px;
+    left: 20%;
+  }
+  .glow-2 {
+    width: 550px;
+    height: 550px;
+    background: radial-gradient(circle, #0284c7, #10b981);
+    bottom: -150px;
+    right: 20%;
   }
   .app{
-    max-width:720px;
+    max-width:980px;
     width:100%;
     margin:0 auto;
     height:100%;
     display:flex;
     flex-direction:column;
     min-width:0;
+    position:relative;
+    z-index:1;
+    background:var(--bg);
+    border-left:1px solid var(--line);
+    border-right:1px solid var(--line);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.45);
+  }
+  @media (max-width: 980px) {
+    .app {
+      border-left: none;
+      border-right: none;
+    }
   }
 
   /* ---------------------------------------------------------------- */
@@ -104,7 +140,7 @@
   .picker-head h1{
     margin:0;
     font-size:22px;
-    font-weight:600;
+    font-weight:700;
     letter-spacing:-0.2px;
   }
   .picker-head p{
@@ -162,22 +198,49 @@
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:12px;
-    padding:14px 18px;
+    gap:16px;
+    padding:14px 20px;
     padding-top: calc(14px + env(safe-area-inset-top, 0px));
     border-bottom:1px solid var(--line);
     background:var(--panel);
+    flex-shrink:0;
+    position:relative;
+    z-index:10;
   }
-  .brand{display:flex;flex-direction:column;gap:2px;min-width:0}
-  .brand .name{font-weight:600;font-size:16px;color:var(--brand-fg, var(--fg));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-width:0;
+    flex:1 1 auto;
+    overflow:hidden;
+  }
+  .brand{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    min-width:0;
+    overflow:hidden;
+  }
+  .brand .name{
+    font-weight:700;
+    font-size:16px;
+    color:var(--brand-fg, var(--fg));
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    letter-spacing:-0.2px;
+  }
   .brand .tag{
     font-family:var(--tag-font, 'IBM Plex Mono',ui-monospace,monospace);
     font-size:11px;
-    letter-spacing:0.4px;
+    letter-spacing:0.5px;
     color:var(--tag-fg, var(--muted));
     white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    display:block;
   }
-  .brand-row{display:flex;align-items:center;gap:12px;min-width:0}
   .brand-logo{height:44px;width:auto;flex:none;display:block}
   .top-bar{
     background:var(--topbar-bg);
@@ -188,7 +251,12 @@
     padding:7px 12px;
     padding-top: calc(7px + env(safe-area-inset-top, 0px));
   }
-  .header-actions{display:flex;align-items:center;gap:8px;flex:none}
+  .header-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-shrink:0;
+  }
   .theme-toggle-btn {
     background: transparent;
     border: 1px solid var(--line);
@@ -197,6 +265,7 @@
     cursor: pointer;
     display: inline-flex;
     align-items: center;
+    flex-shrink: 0;
     transition: all 0.25s ease;
     outline: none;
   }
@@ -256,7 +325,7 @@
     filter: none;
   }
   button.new-order{
-    flex:none;
+    flex-shrink: 0;
     font-family:inherit;
     font-size:13px;
     font-weight:600;
@@ -266,6 +335,7 @@
     border-radius:var(--btn-radius, 999px);
     padding:8px 16px;
     cursor:pointer;
+    white-space: nowrap;
     box-shadow: 0 2px 10px rgba(2, 132, 199, 0.3);
     transition: all 0.2s ease;
   }
@@ -275,7 +345,7 @@
   }
   button.new-order:active{transform: translateY(0); opacity:0.9}
   .switch-agent{
-    flex:none;
+    flex-shrink: 0;
     font-family:inherit;
     font-size:13px;
     font-weight:600;
@@ -283,37 +353,248 @@
     background:rgba(255, 255, 255, 0.05);
     border:1px solid var(--line);
     border-radius:var(--btn-radius, 999px);
-    padding:8px 16px;
+    padding:8px 14px;
     cursor:pointer;
     text-decoration:none;
     display:inline-flex;
     align-items:center;
+    line-height:1;
+    white-space: nowrap;
     transition: all 0.2s ease;
+  }
+  :root[data-theme="light"] .switch-agent {
+    background: #ffffff;
+    border-color: #cbd5e1;
   }
   .switch-agent:hover{
     border-color:var(--accent);
     color:var(--accent);
-    background:rgba(255, 255, 255, 0.08);
+    background:rgba(0, 242, 254, 0.08);
   }
   .switch-agent:active{opacity:0.7}
 
+  @media (max-width: 640px) {
+    header {
+      padding: 10px 14px;
+      gap: 10px;
+    }
+    .brand .tag {
+      display: none;
+    }
+    .switch-agent, button.new-order {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Main chat feed                                                    */
+  /* ---------------------------------------------------------------- */
   main{
     flex:1;
     overflow-y:auto;
-    padding:18px;
+    padding:20px;
     display:flex;
     flex-direction:column;
-    gap:12px;
+    gap:14px;
   }
-  .row{display:flex;min-width:0}
+
+  /* Welcome Banner Card */
+  .hero-welcome-card {
+    background: linear-gradient(145deg, rgba(13, 21, 38, 0.75) 0%, rgba(19, 31, 55, 0.45) 100%);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 22px 20px;
+    margin: 4px 0 10px 0;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: fadeIn 0.3s ease;
+  }
+  :root[data-theme="light"] .hero-welcome-card {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border-color: #e2e8f0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  }
+  .welcome-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #10b981;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+    animation: pulseDot 2s infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  .model-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+  }
+  .welcome-heading {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--fg);
+    letter-spacing: -0.3px;
+  }
+  .welcome-sub {
+    margin: 0;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .welcome-action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 4px;
+  }
+  @media (max-width: 600px) {
+    .welcome-action-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .welcome-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--fg);
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+  }
+  :root[data-theme="light"] .welcome-action-btn {
+    background: #ffffff;
+    border-color: #e2e8f0;
+  }
+  .welcome-action-btn:hover {
+    border-color: var(--accent);
+    background: rgba(0, 242, 254, 0.06);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  }
+  .btn-emoji {
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .btn-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .btn-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .btn-sub {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Chat Message Rows & Avatars */
+  .row{
+    display:flex;
+    gap:10px;
+    align-items:flex-end;
+    min-width:0;
+    animation: fadeIn 0.25s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
   .row.user{justify-content:flex-end}
   .row.agent{justify-content:flex-start}
+
+  .msg-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-bottom: 2px;
+  }
+  .agent-avatar {
+    background: linear-gradient(135deg, #0b1528, #162444);
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
+    padding: 5px;
+  }
+  :root[data-theme="light"] .agent-avatar {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+    box-shadow: none;
+  }
+  .agent-avatar svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .user-avatar {
+    background: linear-gradient(135deg, #0284c7, #2563eb);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+  }
+
+  .msg-content-wrap {
+    max-width: 82%;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .row.user .msg-content-wrap {
+    align-items: flex-end;
+  }
+  .row.agent .msg-content-wrap {
+    align-items: flex-start;
+  }
+
   .bubble{
-    max-width:80%;
-    padding:10px 14px;
-    border-radius:var(--bubble-radius, 16px);
+    padding:12px 16px;
+    border-radius:var(--bubble-radius, 18px);
     font-size:14.5px;
-    line-height:1.5;
+    line-height:1.55;
     white-space:pre-wrap;
     word-wrap:break-word;
     min-width:0;
@@ -322,12 +603,14 @@
     background:var(--bubble-user);
     color:var(--bubble-user-fg);
     border-bottom-right-radius:4px;
+    box-shadow: 0 2px 10px rgba(2, 132, 199, 0.25);
   }
   .row.agent .bubble{
     background:var(--bubble-agent);
     color:var(--bubble-agent-fg);
     border:1px solid var(--line);
     border-bottom-left-radius:4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
   .bubble a{
     color:inherit;
@@ -356,7 +639,7 @@
     display:inline-flex;
     gap:4px;
     align-items:center;
-    padding:4px 2px;
+    padding:8px 12px;
   }
   .typing span{
     width:6px;height:6px;border-radius:50%;
@@ -370,10 +653,72 @@
     40%{transform:scale(1);opacity:1}
   }
 
+  /* ---------------------------------------------------------------- */
+  /* Quick Chips bar above chat form                                    */
+  /* ---------------------------------------------------------------- */
+  .quick-chips-wrapper {
+    padding: 8px 18px 4px 18px;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  .quick-chips-scroll {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 4px;
+  }
+  .quick-chips-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .chips-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    white-space: nowrap;
+    margin-right: 4px;
+  }
+  .chip-item {
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--fg);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  :root[data-theme="light"] .chip-item {
+    background: #f1f5f9;
+  }
+  .chip-item:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0, 242, 254, 0.08);
+    transform: translateY(-1px);
+  }
+  .chip-item:active {
+    transform: translateY(0);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Input Form                                                        */
+  /* ---------------------------------------------------------------- */
   form{
     display:flex;
     gap:10px;
-    padding:12px;
+    padding:12px 18px;
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     border-top:1px solid var(--line);
     background:var(--panel);
@@ -385,16 +730,17 @@
     font-family:inherit;
     font-size:14.5px;
     line-height:1.4;
-    padding:10px 14px;
+    padding:11px 16px;
     border-radius:14px;
     border:1px solid var(--line);
     background:var(--bg);
     color:var(--fg);
     max-height:120px;
+    transition: border-color 0.2s ease;
   }
   textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
   button.send{
-    flex:none;
+    flex-shrink:0;
     font-family:inherit;
     font-weight:600;
     font-size:14px;
@@ -402,7 +748,7 @@
     background:linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
     border:1px solid rgba(255, 255, 255, 0.2);
     border-radius:var(--send-radius, 14px);
-    padding:0 20px;
+    padding:0 22px;
     cursor:pointer;
     box-shadow: 0 2px 10px rgba(2, 132, 199, 0.3);
     transition: all 0.2s ease;
@@ -425,6 +771,8 @@
 </style>
 </head>
 <body>
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
   <div class="app">
 
     <div class="picker" id="picker">
@@ -440,7 +788,7 @@
       <div class="top-bar" id="topBar" hidden></div>
       <header>
         <div class="brand-row">
-          <svg style="width:38px; height:20px; flex-shrink:0; display:block;" viewBox="220 -20 1420 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg style="width:36px; height:20px; flex-shrink:0; display:block;" viewBox="220 -20 1420 760" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="dmEyeGrad" x1="0%" y1="20%" x2="100%" y2="80%">
                 <stop offset="0%" stop-color="#00d2fa" />
@@ -463,7 +811,7 @@
           </svg>
           <div class="brand">
             <span class="name" id="brandName">The Copper Fork</span>
-            <span class="tag" id="brandTag">AMVERIO DINESYNC · AI RESTAURANT ASSISTANT</span>
+            <span class="tag" id="brandTag">DINESYNC · AI ASSISTANT</span>
           </div>
           <img id="brandLogo" class="brand-logo" alt="" hidden />
         </div>
@@ -480,16 +828,27 @@
               </span>
             </span>
           </button>
-          <a href="/" class="switch-agent" id="switchAgentBtn" style="text-decoration:none; display:inline-flex; align-items:center; line-height:1;">← Amverio Site</a>
-          <a href="/admin" class="switch-agent" style="text-decoration:none; display:inline-flex; align-items:center; line-height:1;">Admin Portal ↗</a>
-          <button class="new-order" id="newOrderBtn" type="button">New conversation</button>
+          <a href="/" class="switch-agent" id="switchAgentBtn">← Amverio Site</a>
+          <a href="/admin" class="switch-agent">Admin Portal ↗</a>
+          <button class="new-order" id="newOrderBtn" type="button">New order</button>
         </div>
       </header>
 
       <main id="messages"></main>
 
+      <div class="quick-chips-wrapper" id="quickChipsWrapper">
+        <div class="quick-chips-scroll">
+          <span class="chips-label">Quick Prompts:</span>
+          <button type="button" class="chip-item" data-msg="Can I see the dinner menu?">📋 View Menu</button>
+          <button type="button" class="chip-item" data-msg="I'd like to order a Truffle Burger and sweet potato fries for delivery">🍔 Order Burger</button>
+          <button type="button" class="chip-item" data-msg="Can I book a table for 4 people tonight at 7:30 PM?">📅 Book Table</button>
+          <button type="button" class="chip-item" data-msg="What are your opening hours and address?">📍 Hours & Location</button>
+          <button type="button" class="chip-item" data-msg="How does online payment and delivery work?">💳 Payment Info</button>
+        </div>
+      </div>
+
       <form id="chatForm">
-        <textarea id="input" rows="1" placeholder="Type a message…"></textarea>
+        <textarea id="input" rows="1" placeholder="Book a table or place an order…"></textarea>
         <button class="send" id="sendBtn" type="submit">Send</button>
       </form>
     </div>
@@ -516,8 +875,7 @@
   const rootEl = document.documentElement;
   let appliedVars = [];
 
-  // Per-agent branding (e.g. JMG Cargo's own colours/logo). Inline vars on
-  // <html> override the default palette; clearTheme() puts it back.
+  // Per-agent branding. Inline vars on <html> override the default palette; clearTheme() puts it back.
   function applyTheme(theme){
     clearTheme();
     if (!theme) return;
@@ -554,7 +912,7 @@
   let threadId = null;
   let sending = false;
   let selectedDomainId = null;
-  let domainsById = {};  // id -> {id, brand_name, brand_tag, greeting, new_conversation_label, input_placeholder}
+  let domainsById = {};
 
   function escapeHtml(str){
     return (str || '')
@@ -577,6 +935,22 @@
   function addRow(role, text){
     const row = document.createElement('div');
     row.className = 'row ' + role;
+
+    if (role === 'agent') {
+      const avatar = document.createElement('div');
+      avatar.className = 'msg-avatar agent-avatar';
+      avatar.setAttribute('aria-hidden', 'true');
+      avatar.innerHTML = `<svg viewBox="220 -20 1420 760" fill="none">
+        <path d="M 268 378 C 420 120, 660 10, 924 10 C 1188 10, 1428 120, 1580 378 L 1358 604 L 1264 510 L 1386 386 C 1264 192, 1094 122, 924 122 C 754 122, 584 192, 462 386 L 584 510 L 490 604 Z" fill="url(#dmEyeGrad)" />
+        <path class="amv-symbol-a" d="M 854 220 C 882 165, 966 165, 994 220 L 1288 705 L 1140 705 L 924 355 L 708 705 L 560 705 Z" />
+        <circle cx="924" cy="495" r="86" fill="url(#dmCoreGrad)" />
+      </svg>`;
+      row.appendChild(avatar);
+    }
+
+    const contentWrap = document.createElement('div');
+    contentWrap.className = 'msg-content-wrap';
+
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
     if (role === 'system'){
@@ -584,7 +958,20 @@
     } else {
       bubble.innerHTML = formatMessage(text);
     }
-    row.appendChild(bubble);
+    contentWrap.appendChild(bubble);
+    row.appendChild(contentWrap);
+
+    if (role === 'user') {
+      const avatar = document.createElement('div');
+      avatar.className = 'msg-avatar user-avatar';
+      avatar.setAttribute('aria-hidden', 'true');
+      avatar.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>`;
+      row.appendChild(avatar);
+    }
+
     messagesEl.appendChild(row);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return bubble;
@@ -594,10 +981,25 @@
     const row = document.createElement('div');
     row.className = 'row agent';
     row.id = 'typingRow';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'msg-avatar agent-avatar';
+    avatar.setAttribute('aria-hidden', 'true');
+    avatar.innerHTML = `<svg viewBox="220 -20 1420 760" fill="none">
+      <path d="M 268 378 C 420 120, 660 10, 924 10 C 1188 10, 1428 120, 1580 378 L 1358 604 L 1264 510 L 1386 386 C 1264 192, 1094 122, 924 122 C 754 122, 584 192, 462 386 L 584 510 L 490 604 Z" fill="url(#dmEyeGrad)" />
+      <path class="amv-symbol-a" d="M 854 220 C 882 165, 966 165, 994 220 L 1288 705 L 1140 705 L 924 355 L 708 705 L 560 705 Z" />
+      <circle cx="924" cy="495" r="86" fill="url(#dmCoreGrad)" />
+    </svg>`;
+    row.appendChild(avatar);
+
+    const contentWrap = document.createElement('div');
+    contentWrap.className = 'msg-content-wrap';
     const bubble = document.createElement('div');
     bubble.className = 'bubble typing';
     bubble.innerHTML = '<span></span><span></span><span></span>';
-    row.appendChild(bubble);
+    contentWrap.appendChild(bubble);
+    row.appendChild(contentWrap);
+
     messagesEl.appendChild(row);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -605,6 +1007,70 @@
   function removeTyping(){
     const row = document.getElementById('typingRow');
     if (row) row.remove();
+  }
+
+  // Quick send helper available globally
+  window.quickSend = function(text) {
+    if (sending) return;
+    inputEl.value = text;
+    formEl.requestSubmit();
+  };
+
+  // Wire quick chip clicks
+  document.addEventListener('click', function(e){
+    const chip = e.target.closest('.chip-item');
+    if (chip) {
+      const msg = chip.getAttribute('data-msg');
+      if (msg) quickSend(msg);
+    }
+  });
+
+  // Render hero welcome card
+  function renderWelcomeCard(cfg){
+    const card = document.createElement('div');
+    card.className = 'hero-welcome-card';
+    card.innerHTML = `
+      <div class="welcome-header">
+        <div class="status-indicator">
+          <span class="status-dot"></span>
+          <span>DineSync AI Online</span>
+        </div>
+        <span class="model-badge">Amverio Agent</span>
+      </div>
+      <h3 class="welcome-heading">${escapeHtml(cfg.brand_name || 'The Copper Fork')}</h3>
+      <p class="welcome-sub">I'm your 24/7 restaurant assistant. Ask for menus, place food delivery orders with Stripe payment, or reserve a table instantly.</p>
+      <div class="welcome-action-grid">
+        <button type="button" class="welcome-action-btn" onclick="quickSend('Can I see the dinner menu?')">
+          <span class="btn-emoji">📋</span>
+          <div class="btn-text">
+            <span class="btn-title">View Menu</span>
+            <span class="btn-sub">Starters, mains & drinks</span>
+          </div>
+        </button>
+        <button type="button" class="welcome-action-btn" onclick="quickSend('I\\'d like to order a Truffle Burger and sweet potato fries for delivery')">
+          <span class="btn-emoji">🍔</span>
+          <div class="btn-text">
+            <span class="btn-title">Order Food</span>
+            <span class="btn-sub">Delivery or pickup</span>
+          </div>
+        </button>
+        <button type="button" class="welcome-action-btn" onclick="quickSend('Can I book a table for 4 people tonight at 7:30 PM?')">
+          <span class="btn-emoji">📅</span>
+          <div class="btn-text">
+            <span class="btn-title">Book Table</span>
+            <span class="btn-sub">Instant reservation</span>
+          </div>
+        </button>
+        <button type="button" class="welcome-action-btn" onclick="quickSend('What are your opening hours and address?')">
+          <span class="btn-emoji">📍</span>
+          <div class="btn-text">
+            <span class="btn-title">Hours & Location</span>
+            <span class="btn-sub">Covent Garden, London</span>
+          </div>
+        </button>
+      </div>
+    `;
+    messagesEl.appendChild(card);
   }
 
   // ---- Picker screen -------------------------------------------------
@@ -630,10 +1096,9 @@
     }
   }
 
-  // A dedicated page like /jmgcargo opens straight into that agent.
   const pagePath = location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
   let dedicatedDomainId = null;
-  if (pagePath) pickerEl.hidden = true;  // avoid flashing the picker first
+  if (pagePath) pickerEl.hidden = true;
 
   function renderDomainCards(){
     domainCardsEl.innerHTML = '';
@@ -659,7 +1124,7 @@
     const cfg = domainsById[domainId];
     if (!cfg) return;
 
-    document.title = dedicatedDomainId ? cfg.brand_name + ' — Instant Quote' : cfg.brand_name + ' — Amverio Demo';
+    document.title = dedicatedDomainId ? cfg.brand_name + ' — Instant Booking' : cfg.brand_name + ' — Amverio Demo';
     if (brandNameEl) brandNameEl.textContent = cfg.brand_name;
     if (brandTagEl) brandTagEl.textContent = cfg.brand_tag;
     if (newOrderBtn) newOrderBtn.textContent = cfg.new_conversation_label;
@@ -687,6 +1152,10 @@
   async function startNewThread(greet){
     if (!selectedDomainId) return;
     messagesEl.innerHTML = '';
+    const cfg = domainsById[selectedDomainId] || {};
+    if (greet){
+      renderWelcomeCard(cfg);
+    }
     try {
       const resp = await fetch('/api/new-thread', {
         method: 'POST',
@@ -703,8 +1172,8 @@
       addRow('system', "Couldn't reach the server. Please try again.");
       return;
     }
-    if (greet){
-      addRow('agent', domainsById[selectedDomainId].greeting);
+    if (greet && cfg.greeting){
+      addRow('agent', cfg.greeting);
     }
     inputEl.value = '';
     inputEl.style.height = 'auto';

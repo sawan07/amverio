@@ -24,7 +24,7 @@ def _load_restaurant() -> dict:
     return {
         "id": "restaurant",
         "brand_name": "The Copper Fork",
-        "brand_tag": "AMVERIO DINESYNC · AI RESTAURANT ASSISTANT",
+        "brand_tag": "DINESYNC · AI ASSISTANT",
         "greeting": (
             "Hi, welcome to The Copper Fork. I'm DineSync, your AI restaurant assistant. "
             "I can book you a table or take a food order (pickup or delivery) — what would you like to do?"
