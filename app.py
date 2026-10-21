@@ -49,6 +49,9 @@ from openai import OpenAI
 import domain
 import data
 import db
+import chat as chat_engine
+from twilio.request_validator import RequestValidator
+from twilio.twiml.messaging_response import MessagingResponse
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("amverio")
@@ -566,6 +569,151 @@ def admin_menu(_token: str = Depends(_require_admin)):
             "address": data.BUSINESS.get("address"),
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Twilio WhatsApp Webhook Endpoint
+# ---------------------------------------------------------------------------
+_processed_message_sids: dict[str, float] = {}
+MESSAGE_SID_TTL_SECONDS = 3600  # retain SIDs for 1 hour for idempotency
+
+
+def _evict_stale_message_sids() -> None:
+    now = time.time()
+    stale = [sid for sid, t in _processed_message_sids.items() if now - t > MESSAGE_SID_TTL_SECONDS]
+    for sid in stale:
+        _processed_message_sids.pop(sid, None)
+
+
+def _split_whatsapp_message(text: str, max_length: int = 1500) -> list[str]:
+    """
+    Splits replies longer than max_length into conversational chunks,
+    preferring paragraph breaks, newlines, sentence ends, or spaces.
+    """
+    if not text:
+        return []
+    if len(text) <= max_length:
+        return [text]
+
+    chunks = []
+    remaining = text
+    while len(remaining) > max_length:
+        split_idx = remaining.rfind("\n\n", 0, max_length)
+        if split_idx == -1 or split_idx < max_length // 2:
+            split_idx = remaining.rfind("\n", 0, max_length)
+        if split_idx == -1 or split_idx < max_length // 2:
+            split_idx = remaining.rfind(". ", 0, max_length)
+            if split_idx != -1:
+                split_idx += 1
+        if split_idx == -1 or split_idx < max_length // 2:
+            split_idx = remaining.rfind(" ", 0, max_length)
+        if split_idx == -1:
+            split_idx = max_length
+
+        chunk = remaining[:split_idx].strip()
+        if chunk:
+            chunks.append(chunk)
+        remaining = remaining[split_idx:].strip()
+
+    if remaining:
+        chunks.append(remaining)
+
+    return chunks
+
+
+def _validate_twilio_signature(request: Request, form_data: dict) -> bool:
+    """
+    Validates X-Twilio-Signature header using Twilio's RequestValidator.
+    Rejects requests without valid signatures or missing auth tokens.
+    """
+    auth_token = os.environ.get("TWILIO_AUTH_TOKEN", "").strip()
+    if not auth_token:
+        log.warning("Rejecting Twilio webhook: TWILIO_AUTH_TOKEN is not configured.")
+        return False
+
+    signature = request.headers.get("x-twilio-signature") or request.headers.get("X-Twilio-Signature")
+    if not signature:
+        log.warning("Rejecting Twilio webhook: missing X-Twilio-Signature header.")
+        return False
+
+    validator = RequestValidator(auth_token)
+
+    override_url = os.environ.get("TWILIO_WEBHOOK_URL", "").strip()
+    if override_url:
+        candidates = [override_url]
+    else:
+        proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+        host = request.headers.get("x-forwarded-host", request.headers.get("host", request.url.netloc))
+        url_with_proxy = f"{proto}://{host}{request.url.path}"
+        candidates = [url_with_proxy, str(request.url)]
+
+    for u in candidates:
+        if validator.validate(u, form_data, signature):
+            return True
+
+    log.warning("Rejecting Twilio webhook: signature verification failed for URLs: %s", candidates)
+    return False
+
+
+@app.get("/webhooks/twilio/whatsapp")
+def twilio_whatsapp_info():
+    return {
+        "status": "ready",
+        "description": "Amverio Twilio WhatsApp webhook endpoint (HTTP POST expected)",
+    }
+
+
+@app.post("/webhooks/twilio/whatsapp")
+async def twilio_whatsapp_webhook(request: Request):
+    """
+    Twilio WhatsApp incoming message webhook.
+    Validates signature, enforces idempotency, calls chat.respond(),
+    splits long replies, and returns TwiML MessagingResponse.
+    """
+    form = await request.form()
+    form_data = {k: str(v) for k, v in form.items()}
+
+    # 1. Signature validation
+    if not _validate_twilio_signature(request, form_data):
+        raise HTTPException(status_code=403, detail="Invalid Twilio signature.")
+
+    message_sid = form_data.get("MessageSid", "").strip()
+    from_number = form_data.get("From", "").strip()
+    body = form_data.get("Body", "").strip()
+    num_media = int(form_data.get("NumMedia", "0") or "0")
+
+    # 2. Idempotency: ignore duplicate MessageSid
+    _evict_stale_message_sids()
+    if message_sid:
+        if message_sid in _processed_message_sids:
+            log.info("Ignoring duplicate MessageSid: %s", message_sid)
+            resp = MessagingResponse()
+            return Response(content=str(resp), media_type="application/xml")
+        _processed_message_sids[message_sid] = time.time()
+
+    # 3. Handle empty / media-only messages politely
+    resp = MessagingResponse()
+    if not body:
+        if num_media > 0:
+            resp.message("Thanks for sharing that! Currently, I can only read text messages. Please send your question or request as text.")
+        else:
+            resp.message("Hello! Welcome to The Copper Fork. How can I help you today with table bookings or menu orders?")
+        return Response(content=str(resp), media_type="application/xml")
+
+    # 4. Drive agent response via chat_engine.respond()
+    session_id = from_number or "whatsapp-default"
+    try:
+        reply_text = chat_engine.respond(session_id=session_id, user_text=body, domain_id="restaurant")
+    except Exception as e:
+        log.exception("Error generating agent reply for %s: %s", session_id, e)
+        reply_text = "I'm having a little trouble right now. Please give us a call at the restaurant or try again shortly."
+
+    # 5. Split replies > 1600 chars into multiple TwiML messages
+    chunks = _split_whatsapp_message(reply_text, max_length=1500)
+    for chunk in chunks:
+        resp.message(chunk)
+
+    return Response(content=str(resp), media_type="application/xml")
 
 
 def _admin_page():
