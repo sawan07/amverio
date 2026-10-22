@@ -4,7 +4,7 @@
 - **Category**: `baseline`
 - **Status**: `PASSED`
 - **Verification**: Handled delivery order appropriately
-- **Date**: 2026-10-21 19:36:06
+- **Date**: 2026-10-22 13:17:37
 
 ## Conversation Transcript
 
@@ -96,5 +96,7 @@
 ]
 ```
 
-**DineSync**: We can deliver Beer-Battered Fish & Chips (market fish, mushy peas, tartare sauce) for £14. Would you like just one order, or more? Please confirm the quantity before I place your order.
+**DineSync**: Yes, we can deliver Beer-Battered Fish & Chips (market fish, mushy peas, tartare sauce) for £14.00.
+
+To confirm: you’d like 1 order of Fish & Chips delivered to Priya Shah, 07222333444, priya.shah@example.com. Is that correct? Would you like to add anything else to your order?
 

@@ -4,7 +4,7 @@
 - **Category**: `edge_case`
 - **Status**: `PASSED`
 - **Verification**: Welcomed politely in English and processed table inquiry
-- **Date**: 2026-10-21 19:37:08
+- **Date**: 2026-10-22 13:18:37
 
 ## Conversation Transcript
 
@@ -18,20 +18,43 @@
   {
     "tool": "check_table_availability",
     "args": {
-      "date": "2026-10-21",
+      "date": "2026-10-22",
       "time": "19:00",
       "party_size": 2
     },
     "result": {
-      "available": false,
-      "date": "2026-10-21",
+      "available": true,
+      "date": "2026-10-22",
       "time": "19:00",
       "party_size": 2,
-      "reason": "That date/time has already passed."
+      "table_id": "T1"
+    }
+  },
+  {
+    "tool": "book_table",
+    "args": {
+      "date": "2026-10-22",
+      "time": "19:00",
+      "party_size": 2,
+      "customer_name": "Jean Dupont",
+      "customer_phone": "07123456789"
+    },
+    "result": {
+      "success": true,
+      "reservation_id": "R0014",
+      "id": "R0014",
+      "table_id": "T1",
+      "date": "2026-10-22",
+      "time": "19:00",
+      "party_size": 2,
+      "name": "Jean Dupont",
+      "phone": "07123456789",
+      "status": "CONFIRMED",
+      "created_at": "2026-10-22 13:18"
     }
   }
 ]
 ```
 
-**DineSync**: Bonsoir Jean, malheureusement il n'est plus possible de réserver pour ce soir à 19h, car l'heure est déjà passée. Souhaitez-vous une table pour plus tard ce soir, ou pour une autre date ?
+**DineSync**: Bonsoir Jean, votre table pour 2 personnes est réservée ce soir à 19h. Nous avons bien noté votre nom et numéro. À tout à l’heure au Copper Fork !
 

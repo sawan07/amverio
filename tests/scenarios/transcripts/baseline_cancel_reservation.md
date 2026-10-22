@@ -4,7 +4,7 @@
 - **Category**: `baseline`
 - **Status**: `PASSED`
 - **Verification**: Successfully triggered cancel_reservation
-- **Date**: 2026-10-21 19:36:13
+- **Date**: 2026-10-22 13:17:44
 
 ## Conversation Transcript
 
@@ -50,13 +50,13 @@
       "name": "Jordan Blake",
       "phone": "07111 222333",
       "status": "CONFIRMED",
-      "created_at": "2026-10-21 19:36"
+      "created_at": "2026-10-22 13:17"
     }
   }
 ]
 ```
 
-**DineSync**: Your table for 2 is booked this Saturday, 24th October at 7pm under Jordan Blake. If you need to make any changes, just let me know. Looking forward to welcoming you!
+**DineSync**: Your table for 2 is booked this Saturday at 7pm under Jordan Blake. If you need to make any changes, just let me know. Looking forward to welcoming you!
 
 ### Turn 2
 
@@ -78,5 +78,5 @@
 ]
 ```
 
-**DineSync**: Your booking for 2 on Saturday at 7pm has been cancelled. If you need to rebook or have any other requests, just let me know!
+**DineSync**: Your reservation for this Saturday at 7pm has been cancelled. If you need to rebook or have any other requests, just let me know!
 

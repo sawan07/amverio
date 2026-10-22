@@ -4,7 +4,7 @@
 - **Category**: `baseline`
 - **Status**: `PASSED`
 - **Verification**: Cancelled old booking and booked new time
-- **Date**: 2026-10-21 19:36:19
+- **Date**: 2026-10-22 13:17:49
 
 ## Conversation Transcript
 
@@ -50,7 +50,7 @@
       "name": "Priya Shah",
       "phone": "07222 333444",
       "status": "CONFIRMED",
-      "created_at": "2026-10-21 19:36"
+      "created_at": "2026-10-22 13:17"
     }
   }
 ]
@@ -110,11 +110,11 @@
       "name": "Priya Shah",
       "phone": "07222 333444",
       "status": "CONFIRMED",
-      "created_at": "2026-10-21 19:36"
+      "created_at": "2026-10-22 13:17"
     }
   }
 ]
 ```
 
-**DineSync**: Your table is now booked for 4 people at 9pm this Sunday, 25th October, under Priya Shah. The earlier reservation at 8pm has been cancelled. See you at 9pm!
+**DineSync**: Your table is now booked for 4 people at 9pm this Sunday, 25th October, under Priya Shah. The earlier reservation has been cancelled. See you then!
 

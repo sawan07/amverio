@@ -4,7 +4,7 @@
 - **Category**: `baseline`
 - **Status**: `PASSED`
 - **Verification**: Placed updated order with single burger and fries
-- **Date**: 2026-10-21 19:36:25
+- **Date**: 2026-10-22 13:17:55
 
 ## Conversation Transcript
 
@@ -96,15 +96,13 @@
 ]
 ```
 
-**DineSync**: Two chargrilled chicken burgers for pickup—no problem! I just need your name, phone number, and email address to confirm your order and send you a payment link. Could you please provide those details?
+**DineSync**: Great choice! I can place an order for two chargrilled chicken burgers for pickup. May I have your name, phone number, and email address to confirm your order?
 
 ### Turn 2
 
 **Customer**: Actually, make that one burger, and add a side of fries instead.
 
-**DineSync**: No problem—your order is now one chargrilled chicken burger and one side of fries for pickup.
-
-Could you please provide your name, phone number, and email address to confirm and send your payment link?
+**DineSync**: No problem—so that's one chargrilled chicken burger and one side of skin-on fries for pickup. Could I have your name, phone number, and email address to confirm your order?
 
 ### Turn 3
 
@@ -135,7 +133,7 @@ Could you please provide your name, phone number, and email address to confirm a
       "success": true,
       "order_id": "O0005",
       "total": 17.5,
-      "payment_link": "https://buy.stripe.com/test_fZubJ364H75K8FM9021kA0B",
+      "payment_link": "https://buy.stripe.com/test_dRmfZj50Deyc1dk1xA1kA19",
       "email_sent_to": "sam@example.com",
       "order_type": "pickup",
       "items": [
@@ -162,7 +160,7 @@ Could you please provide your name, phone number, and email address to confirm a
 
 **DineSync**: Your order is confirmed: one chargrilled chicken burger and one side of fries for pickup. Total is £17.50.
 
-A receipt has been sent to sam@example.com. Please pay using this secure Stripe link: https://buy.stripe.com/test_fZubJ364H75K8FM9021kA0B
+A confirmation has been sent to sam@example.com. Please pay using this secure Stripe link: https://buy.stripe.com/test_dRmfZj50Deyc1dk1xA1kA19
 
-Thank you, Sam! Your food will be ready for you to collect.
+Thank you, Sam!
 

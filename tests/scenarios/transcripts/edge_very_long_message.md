@@ -4,7 +4,7 @@
 - **Category**: `edge_case`
 - **Status**: `PASSED`
 - **Verification**: Extracted buried reservation info and checked/booked table
-- **Date**: 2026-10-21 19:37:11
+- **Date**: 2026-10-22 13:18:40
 
 ## Conversation Transcript
 
@@ -41,8 +41,8 @@
     },
     "result": {
       "success": true,
-      "reservation_id": "R0014",
-      "id": "R0014",
+      "reservation_id": "R0015",
+      "id": "R0015",
       "table_id": "T1",
       "date": "2026-10-24",
       "time": "19:30",
@@ -50,11 +50,11 @@
       "name": "David Miller",
       "phone": "07987654321",
       "status": "CONFIRMED",
-      "created_at": "2026-10-21 19:37"
+      "created_at": "2026-10-22 13:18"
     }
   }
 ]
 ```
 
-**DineSync**: Your table for two is confirmed for this Saturday at 7:30pm, David. We’re honoured to be part of your anniversary celebration! If you have any special requests, just let us know. We look forward to welcoming you and your partner to The Copper Fork.
+**DineSync**: Your table for two is booked this Saturday at 7:30pm, David. We’re delighted you chose The Copper Fork for your anniversary—congratulations on ten years! If you’d like to see our menu or have any special requests, just let me know. We look forward to welcoming you both!
 

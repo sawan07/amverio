@@ -4,7 +4,7 @@
 - **Category**: `edge_case`
 - **Status**: `PASSED`
 - **Verification**: Clarified ambiguous date/time in turn 1 and booked in turn 2
-- **Date**: 2026-10-21 19:36:38
+- **Date**: 2026-10-22 13:18:06
 
 ## Conversation Transcript
 
@@ -12,7 +12,7 @@
 
 **Customer**: I want a table for 4 next weekend in the evening. Alex, 07123456789.
 
-**DineSync**: Could you please specify the exact date and time you'd like to book for next weekend? That way, I can check availability for your table for 4.
+**DineSync**: Could you please specify the exact date and time you'd like the table for 4? That way, I can check availability and book it for you.
 
 ### Turn 2
 
@@ -56,11 +56,11 @@
       "name": "Alex",
       "phone": "07123456789",
       "status": "CONFIRMED",
-      "created_at": "2026-10-21 19:36"
+      "created_at": "2026-10-22 13:18"
     }
   }
 ]
 ```
 
-**DineSync**: Your table for 4 is booked for Saturday, 24th October at 7pm under the name Alex. We look forward to welcoming you! If you need to make any changes, just let us know.
+**DineSync**: Your table for 4 is booked for Saturday, 24th October at 7pm under the name Alex. If you need to make any changes, just let me know. Looking forward to welcoming you!
 

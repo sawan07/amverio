@@ -11,8 +11,11 @@ import os
 import sys
 import json
 import time
+import logging
 from datetime import datetime
 from typing import Optional
+
+log = logging.getLogger("amverio.chat")
 
 # Load .env file if present
 _env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -70,10 +73,18 @@ def _get_or_create_session(session_id: str, domain_id: str) -> dict:
 def run_tool(active_domain: dict, name: str, tool_input: dict) -> dict:
     fn = active_domain["tool_functions"].get(name)
     if fn is None:
+        log.error("run_tool error: Unknown tool %r (args=%s)", name, tool_input)
         return {"error": f"Unknown tool: {name}"}
     try:
-        return fn(**tool_input)
+        log.info("Executing tool: %s with args: %s", name, tool_input)
+        result = fn(**tool_input)
+        if isinstance(result, dict) and result.get("success") is False:
+            log.warning("Tool %s returned failure: %s (args=%s)", name, result.get("reason"), tool_input)
+        else:
+            log.info("Tool %s succeeded (args=%s)", name, tool_input)
+        return result
     except Exception as e:
+        log.exception("Tool execution failed: tool=%s input=%s error=%s", name, tool_input, e)
         return {"error": str(e)}
 
 
@@ -91,6 +102,7 @@ def respond(
     active_domain_id = domain_id or os.environ.get("AMVERIO_DOMAIN", "restaurant").strip().lower()
     session = _get_or_create_session(session_id, active_domain_id)
     active = domain.get_domain(session["domain"])
+    log.info("respond incoming: session_id=%s domain=%s text=%r", session_id, active_domain_id, user_text)
 
     if client is None:
         api_key = os.environ.get("OPENAI_API_KEY")
@@ -126,11 +138,14 @@ def respond(
 
         if not msg.tool_calls:
             session["last_seen"] = time.time()
-            return msg.content or ""
+            reply = msg.content or ""
+            log.info("respond reply: session_id=%s preview=%r", session_id, reply[:120] if reply else "")
+            return reply
 
         for call in msg.tool_calls:
             args = json.loads(call.function.arguments or "{}")
             result = run_tool(active, call.function.name, args)
+            log.info("respond tool finished: session=%s tool=%s args=%s -> result=%s", session_id, call.function.name, args, result)
             messages.append({
                 "role": "tool",
                 "tool_call_id": call.id,

@@ -4,7 +4,7 @@
 - **Category**: `edge_case`
 - **Status**: `PASSED`
 - **Verification**: Identified drinks as unlisted and successfully placed valid food items
-- **Date**: 2026-10-21 19:36:49
+- **Date**: 2026-10-22 13:18:17
 
 ## Conversation Transcript
 
@@ -115,7 +115,7 @@
       "success": true,
       "order_id": "O0007",
       "total": 25.5,
-      "payment_link": "https://buy.stripe.com/test_3cI3cx9gT0Hm4pw0tw1kA0D",
+      "payment_link": "https://buy.stripe.com/test_aFa3cx8cP89O4pw1xA1kA1b",
       "email_sent_to": "sam@example.com",
       "order_type": "pickup",
       "items": [
@@ -140,17 +140,17 @@
 ]
 ```
 
-**DineSync**: I've placed your pickup order for 1 Soup of the Day and 1 8oz Sirloin Steak. (It looks like Diet Coke isn't on our menu, so it's not included.) The total is £25.50.
+**DineSync**: Your pickup order is confirmed: 1 Soup of the Day and 1 8oz Sirloin Steak. (It looks like Diet Coke isn't on our menu, so it's not included—sorry about that!)
 
-A confirmation has been sent to sam@example.com. Please pay using this link: https://buy.stripe.com/test_3cI3cx9gT0Hm4pw0tw1kA0D
+Total: £25.50. An order confirmation has been sent to sam@example.com. Please pay securely here: https://buy.stripe.com/test_aFa3cx8cP89O4pw1xA1kA1b
 
-If you have questions or want to add drinks, let us know!
+If you have any questions or need to add drinks, just let us know!
 
 ### Turn 2
 
 **Customer**: Yes, that's fine, go ahead with just the food.
 
-**DineSync**: Your order is all set for pickup: 1 Soup of the Day and 1 8oz Sirloin Steak, total £25.50. The confirmation is in your email, and you can pay here: https://buy.stripe.com/test_3cI3cx9gT0Hm4pw0tw1kA0D
+**DineSync**: Your order for 1 Soup of the Day and 1 8oz Sirloin Steak is all set for pickup. Please use this link to pay: https://buy.stripe.com/test_aFa3cx8cP89O4pw1xA1kA1b
 
-Thank you, Sam! See you soon at The Copper Fork.
+Your receipt has been emailed to you. Thank you, Sam!
 

@@ -13,6 +13,7 @@ import os
 import re
 import json
 import time
+import logging
 import smtplib
 import urllib.request
 import urllib.parse
@@ -20,12 +21,15 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from datetime import datetime, timedelta
+from typing import Optional
 from data import (
     BUSINESS, TABLES, MENU, MENU_BY_ID,
     DEFAULT_SEATING_MINUTES,
     next_reservation_id, next_order_id,
 )
 import db
+
+log = logging.getLogger("amverio.tools")
 
 # Load .env file if present
 _env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -39,6 +43,33 @@ if os.path.exists(_env_file):
                     os.environ.setdefault(_k.strip(), _v.strip().strip("'\""))
     except Exception:
         pass
+
+
+def _find_menu_item(identifier: str) -> Optional[dict]:
+    """
+    Robustly resolves a menu item by:
+    1. Exact ID (e.g. 'M1')
+    2. Case-insensitive ID (e.g. 'm1')
+    3. Exact item name case-insensitive (e.g. 'Chargrilled Chicken Burger')
+    4. Fuzzy substring match (e.g. 'chicken burger' matches 'Chargrilled Chicken Burger')
+    """
+    if not identifier:
+        return None
+    raw = str(identifier).strip()
+    if raw in MENU_BY_ID:
+        return MENU_BY_ID[raw]
+    raw_upper = raw.upper()
+    for item in MENU:
+        if item["id"].upper() == raw_upper:
+            return item
+    raw_lower = raw.lower()
+    for item in MENU:
+        if item["name"].lower() == raw_lower:
+            return item
+    for item in MENU:
+        if raw_lower in item["name"].lower() or item["name"].lower() in raw_lower:
+            return item
+    return None
 
 
 def _parse_dt(date_str: str, time_str: str) -> datetime:
@@ -94,8 +125,9 @@ def _table_is_free(table_id: str, start: datetime, end: datetime) -> bool:
 # Tools
 # ---------------------------------------------------------------------------
 
-def get_menu() -> dict:
+def get_menu(**kwargs) -> dict:
     """Return the full menu, grouped by category."""
+    log.info("get_menu tool executed (extra_kwargs=%s)", kwargs)
     by_category = {}
     for item in MENU:
         by_category.setdefault(item["category"], []).append({
@@ -107,13 +139,15 @@ def get_menu() -> dict:
     return {"restaurant": BUSINESS["name"], "currency": BUSINESS["currency"], "menu": by_category}
 
 
-def check_table_availability(date: str, time: str, party_size: int) -> dict:
+def check_table_availability(date: str, time: str, party_size: int, **kwargs) -> dict:
     """
     date: 'YYYY-MM-DD', time: 'HH:MM' (24h), party_size: number of guests.
     Returns whether a table is free, and which table would be offered.
     """
+    log.info("check_table_availability: date=%s time=%s party_size=%s kwargs=%s", date, time, party_size, kwargs)
     start = _parse_dt(date, time)
     if start < datetime.now():
+        log.warning("check_table_availability: requested past date/time (%s %s)", date, time)
         return {
             "available": False,
             "date": date,
@@ -128,6 +162,7 @@ def check_table_availability(date: str, time: str, party_size: int) -> dict:
 
     for table in candidates:
         if _table_is_free(table["id"], start, end):
+            log.info("check_table_availability: available table found: %s", table["id"])
             return {
                 "available": True,
                 "date": date,
@@ -136,6 +171,7 @@ def check_table_availability(date: str, time: str, party_size: int) -> dict:
                 "table_id": table["id"],
             }
 
+    log.warning("check_table_availability: no table free for party_size=%s at %s %s", party_size, date, time)
     return {
         "available": False,
         "date": date,
@@ -145,12 +181,14 @@ def check_table_availability(date: str, time: str, party_size: int) -> dict:
     }
 
 
-def book_table(date: str, time: str, party_size: int, customer_name: str, customer_phone: str) -> dict:
+def book_table(date: str, time: str, party_size: int, customer_name: str, customer_phone: str, **kwargs) -> dict:
     """
     Books a table if one is available. Always call check_table_availability
     first in conversation, but this re-checks itself before committing.
     """
+    log.info("book_table called: date=%s time=%s party_size=%s name=%s phone=%s (extra=%s)", date, time, party_size, customer_name, customer_phone, kwargs)
     if not _is_valid_uk_phone(customer_phone):
+        log.warning("book_table rejected: invalid UK phone number: %r", customer_phone)
         return {
             "success": False,
             "reason": "That doesn't look like a valid UK phone number. Please provide one, e.g. 07123 456789 or +44 7123 456789.",
@@ -158,6 +196,7 @@ def book_table(date: str, time: str, party_size: int, customer_name: str, custom
 
     availability = check_table_availability(date, time, party_size)
     if not availability["available"]:
+        log.warning("book_table rejected: availability check failed: %s", availability.get("reason"))
         return {"success": False, "reason": availability.get("reason", "No table available.")}
 
     reservation = {
@@ -171,14 +210,23 @@ def book_table(date: str, time: str, party_size: int, customer_name: str, custom
         "status": "CONFIRMED",
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
-    db.add_reservation(reservation)
+    try:
+        db.add_reservation(reservation)
+        log.info("book_table succeeded: reservation_id=%s table=%s", reservation["id"], reservation["table_id"])
+    except Exception as e:
+        log.exception("book_table DB insert failed for reservation %s: %s", reservation.get("id"), e)
+        return {"success": False, "reason": "Database error while confirming reservation. Please try again."}
+
     return {"success": True, "reservation_id": reservation["id"], **reservation}
 
 
-def cancel_reservation(reservation_id: str) -> dict:
+def cancel_reservation(reservation_id: str, **kwargs) -> dict:
+    log.info("cancel_reservation called: reservation_id=%s (extra=%s)", reservation_id, kwargs)
     updated = db.update_reservation_status(reservation_id, "CANCELLED")
     if updated:
+        log.info("cancel_reservation succeeded: reservation_id=%s", reservation_id)
         return {"success": True, "reservation_id": reservation_id}
+    log.warning("cancel_reservation failed: reservation_id=%s not found or already cancelled", reservation_id)
     return {"success": False, "reason": "Reservation not found or already cancelled."}
 
 
@@ -236,9 +284,10 @@ def _create_stripe_payment_link(order_id: str, line_items: list, total: float, c
         with urllib.request.urlopen(pl_req, timeout=10) as pl_resp:
             pl_json = json.loads(pl_resp.read().decode("utf-8"))
             if pl_json.get("url"):
+                log.info("Stripe Payment Link created: %s for order %s", pl_json["url"], order_id)
                 return pl_json["url"]
     except Exception as e:
-        print(f"Stripe Payment Links API error: {e}, falling back to Checkout Sessions")
+        log.warning("Stripe Payment Links API error for order %s: %s, falling back to Checkout Sessions", order_id, e)
 
     # 2. Secondary fallback: Checkout Sessions
     try:
@@ -270,9 +319,11 @@ def _create_stripe_payment_link(order_id: str, line_items: list, total: float, c
         )
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-            return data.get("url") or f"https://checkout.stripe.com/c/pay/{data.get('id')}"
+            fallback_url = data.get("url") or f"https://checkout.stripe.com/c/pay/{data.get('id')}"
+            log.info("Stripe Checkout Session created: %s for order %s", fallback_url, order_id)
+            return fallback_url
     except Exception as e:
-        print(f"Stripe session error: {e}")
+        log.warning("Stripe Checkout Session error for order %s: %s; using demo fallback link", order_id, e)
         return f"https://checkout.stripe.com/c/pay/cs_test_demo_{order_id.lower()}#order={order_id}"
 
 
@@ -306,7 +357,7 @@ def _send_brevo_confirmation_email(
     Falls back gracefully if credentials are missing or send fails.
     """
     if _is_email_throttled(customer_email):
-        print(f"Brevo email throttled for {customer_email} (max 3/hr per address)")
+        log.warning("Brevo email throttled for %s (max 3/hr per address)", customer_email)
         return {"ok": True, "throttled": True, "detail": "Email dispatch throttled for demo."}
 
     smtp_host = os.environ.get("SMTP_HOST", "smtp-relay.brevo.com").strip()
@@ -387,10 +438,10 @@ def _send_brevo_confirmation_email(
             server.login(smtp_user, smtp_pass)
             server.sendmail(sender_email, [customer_email], msg.as_string())
             server.quit()
-            print(f"Brevo email sent successfully via SMTP to {customer_email}")
+            log.info("Brevo email sent successfully via SMTP to %s for order %s", customer_email, order_id)
             return {"sent": True, "method": "smtp", "recipient": customer_email}
         except Exception as e:
-            print(f"Brevo SMTP send error: {e}")
+            log.warning("Brevo SMTP send error for order %s: %s", order_id, e)
 
     # 2. Try sending via REST API if key starts with xkeysib
     brevo_api_key = os.environ.get("BREVO_API_KEY", "").strip()
@@ -413,12 +464,13 @@ def _send_brevo_confirmation_email(
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
-                print(f"Brevo email sent successfully via REST API to {customer_email}")
+                log.info("Brevo email sent successfully via REST API to %s for order %s", customer_email, order_id)
                 return {"sent": True, "method": "api", "recipient": customer_email}
         except Exception as e:
-            print(f"Brevo REST API error: {e}")
+            log.warning("Brevo REST API error for order %s: %s", order_id, e)
 
     # Simulated fallback if no send succeeded
+    log.info("Brevo email simulated for %s (no SMTP or REST API send)", customer_email)
     return {"sent": False, "simulated": True, "recipient": customer_email}
 
 
@@ -428,42 +480,86 @@ def place_order(
     customer_name: str,
     customer_phone: str,
     customer_email: str = "",
+    delivery_address: str = "",
+    delivery_time: str = "",
+    **kwargs,
 ) -> dict:
     """
-    items: list of {"menu_id": str, "quantity": int}
+    items: list of {"menu_id": str, "quantity": int} or similar
     order_type: "pickup" or "delivery"
     customer_name: customer's full name
     customer_phone: valid UK phone number
     customer_email: customer's email address for confirmation receipt & payment link
+    delivery_address: optional customer delivery address
+    delivery_time: optional delivery or collection time
+    kwargs: safely absorbs any extra parameters passed by the LLM
     """
-    if order_type not in ("pickup", "delivery"):
+    log.info(
+        "place_order called: order_type=%r customer_name=%r customer_phone=%r customer_email=%r items=%s delivery_time=%r delivery_address=%r extra_kwargs=%s",
+        order_type,
+        customer_name,
+        customer_phone,
+        customer_email,
+        items,
+        delivery_time,
+        delivery_address,
+        kwargs,
+    )
+
+    clean_order_type = str(order_type or "").strip().lower()
+    if clean_order_type not in ("pickup", "delivery", "collection"):
+        log.warning("place_order rejected: invalid order_type: %r", order_type)
         return {"success": False, "reason": "order_type must be 'pickup' or 'delivery'."}
+    if clean_order_type == "collection":
+        clean_order_type = "pickup"
 
     if not _is_valid_uk_phone(customer_phone):
+        log.warning("place_order rejected: invalid UK phone: %r", customer_phone)
         return {
             "success": False,
             "reason": "That doesn't look like a valid UK phone number. Please provide one, e.g. 07123 456789 or +44 7123 456789.",
         }
 
     if not _is_valid_email(customer_email):
+        log.warning("place_order rejected: invalid email: %r", customer_email)
         return {
             "success": False,
             "reason": "Please provide a valid email address (e.g. name@example.com) so we can send your order confirmation.",
         }
 
+    if not items or not isinstance(items, list):
+        log.warning("place_order rejected: empty or non-list items: %r", items)
+        return {"success": False, "reason": "No items specified for this order."}
+
     line_items = []
     total = 0.0
     for entry in items:
-        menu_item = MENU_BY_ID.get(entry["menu_id"])
+        item_identifier = None
+        qty = 1
+        if isinstance(entry, dict):
+            item_identifier = entry.get("menu_id") or entry.get("id") or entry.get("name")
+            qty = entry.get("quantity", 1)
+        elif isinstance(entry, str):
+            item_identifier = entry
+
+        menu_item = _find_menu_item(item_identifier)
         if not menu_item:
-            return {"success": False, "reason": f"Unknown menu item: {entry['menu_id']}"}
-        qty = entry.get("quantity", 1)
-        line_total = menu_item["price"] * qty
+            log.warning("place_order rejected: unknown menu item identifier %r in entry %s", item_identifier, entry)
+            return {"success": False, "reason": f"Unknown menu item: '{item_identifier}'. Please choose from our menu."}
+
+        try:
+            qty_int = int(qty)
+            if qty_int <= 0:
+                qty_int = 1
+        except (ValueError, TypeError):
+            qty_int = 1
+
+        line_total = menu_item["price"] * qty_int
         total += line_total
         line_items.append({
             "menu_id": menu_item["id"],
             "name": menu_item["name"],
-            "quantity": qty,
+            "quantity": qty_int,
             "unit_price": menu_item["price"],
             "line_total": round(line_total, 2),
         })
@@ -475,7 +571,7 @@ def place_order(
         order_id=order_id,
         customer_name=customer_name,
         customer_email=customer_email,
-        order_type=order_type,
+        order_type=clean_order_type,
         line_items=line_items,
         total=round_total,
         payment_link=payment_link,
@@ -484,7 +580,7 @@ def place_order(
     order = {
         "id": order_id,
         "items": line_items,
-        "order_type": order_type,
+        "order_type": clean_order_type,
         "name": customer_name,
         "phone": customer_phone,
         "email": customer_email,
@@ -496,14 +592,21 @@ def place_order(
         "email_status": "sent" if email_result.get("sent") else ("simulated" if email_result.get("simulated") else "failed"),
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
-    db.add_order(order)
+    try:
+        db.add_order(order)
+        log.info("Order %s persisted to database successfully", order_id)
+    except Exception as e:
+        log.exception("place_order DB insert failed for order %s: %s", order_id, e)
+        return {"success": False, "reason": "Database error while recording order. Please try again."}
+
+    log.info("place_order succeeded: order_id=%s total=£%.2f payment_link=%s", order_id, round_total, payment_link)
     return {
         "success": True,
         "order_id": order["id"],
         "total": order["total"],
         "payment_link": payment_link,
         "email_sent_to": customer_email,
-        "order_type": order_type,
+        "order_type": clean_order_type,
         "items": line_items,
         "customer_name": customer_name,
     }

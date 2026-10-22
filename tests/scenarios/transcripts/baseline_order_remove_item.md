@@ -4,7 +4,7 @@
 - **Category**: `baseline`
 - **Status**: `PASSED`
 - **Verification**: Placed final order with only the soup
-- **Date**: 2026-10-21 19:36:32
+- **Date**: 2026-10-22 13:18:01
 
 ## Conversation Transcript
 
@@ -96,13 +96,13 @@
 ]
 ```
 
-**DineSync**: You can absolutely order a Soup of the Day (£6.50) and a Chocolate Brownie (£6.00) for pickup. May I have your name, phone number, and email address to confirm your order and send you the payment link?
+**DineSync**: Our soup of the day and chocolate brownie are both available for pickup. Could I have your name, phone number, and email address to confirm your order?
 
 ### Turn 2
 
 **Customer**: Actually scrap the brownie, just the soup please.
 
-**DineSync**: No problem—just the Soup of the Day for pickup. Could I have your name, phone number, and email address to confirm your order and send you the payment link?
+**DineSync**: No problem—just the soup of the day for pickup. May I have your name, phone number, and email address to confirm your order?
 
 ### Turn 3
 
@@ -129,7 +129,7 @@
       "success": true,
       "order_id": "O0006",
       "total": 6.5,
-      "payment_link": "https://buy.stripe.com/test_8x2fZjct5ahWcW2foq1kA0C",
+      "payment_link": "https://buy.stripe.com/test_3cI9AV50Dcq4cW2b8a1kA1a",
       "email_sent_to": "priya@example.com",
       "order_type": "pickup",
       "items": [
@@ -147,7 +147,7 @@
 ]
 ```
 
-**DineSync**: Your order for 1 Soup of the Day for pickup is confirmed—total is £6.50. A receipt has been sent to priya@example.com. Please pay using this secure Stripe link: https://buy.stripe.com/test_8x2fZjct5ahWcW2foq1kA0C
+**DineSync**: Your order for one soup of the day for pickup is confirmed—total is £6.50. A receipt has been sent to priya@example.com. Please pay using this secure Stripe link: https://buy.stripe.com/test_3cI9AV50Dcq4cW2b8a1kA1a
 
 Thank you, Priya!
 

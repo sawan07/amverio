@@ -4,7 +4,7 @@
 - **Category**: `baseline`
 - **Status**: `PASSED`
 - **Verification**: Retrieved menu and prompted for order confirmation with price or placed order
-- **Date**: 2026-10-21 19:36:05
+- **Date**: 2026-10-22 13:17:35
 
 ## Conversation Transcript
 
@@ -99,24 +99,24 @@
 **DineSync**: Here’s our menu:
 
 Starters:
-- Soup of the Day (£6.50) – Ask for today’s flavour, served with sourdough
-- Garlic Flatbread (£5.50) – Stone-baked, garlic butter, herbs
+- Soup of the Day (£6.50) – Ask for today’s flavour, served with sourdough.
+- Garlic Flatbread (£5.50) – Stone-baked, with garlic butter and herbs.
 
 Mains:
-- Chargrilled Chicken Burger (£13.50) – Buttermilk chicken, smoked bacon, fries
-- 8oz Sirloin Steak (£19.00) – Chargrilled, peppercorn sauce, fries
-- Wild Mushroom Risotto (£12.50) – Vegetarian, arborio rice, wild mushrooms, parmesan
-- Beer-Battered Fish & Chips (£14.00) – Market fish, mushy peas, tartare sauce
+- Chargrilled Chicken Burger (£13.50) – Buttermilk chicken, smoked bacon, fries.
+- 8oz Sirloin Steak (£19.00) – Chargrilled, peppercorn sauce, fries.
+- Wild Mushroom Risotto (£12.50) – Vegetarian, with parmesan.
+- Beer-Battered Fish & Chips (£14.00) – Market fish, mushy peas, tartare sauce.
 
 Sides:
 - Skin-On Fries (£4.00)
 - Seasonal Greens (£4.00)
 
 Desserts:
-- Sticky Toffee Pudding (£6.00) – Butterscotch sauce, vanilla ice cream
-- Chocolate Brownie (£6.00) – Warm brownie, vanilla ice cream
+- Sticky Toffee Pudding (£6.00) – With butterscotch sauce, vanilla ice cream.
+- Chocolate Brownie (£6.00) – Warm, with vanilla ice cream.
 
-Let me know if you’d like to order for pickup or delivery, or if you have any questions!
+Would you like to place an order for pickup or delivery?
 
 ### Turn 2
 
@@ -147,7 +147,7 @@ Let me know if you’d like to order for pickup or delivery, or if you have any 
       "success": true,
       "order_id": "O0004",
       "total": 31.0,
-      "payment_link": "https://buy.stripe.com/test_4gM5kFeBdahW1dk6RU1kA0A",
+      "payment_link": "https://buy.stripe.com/test_28E28tdx90HmcW2b8a1kA18",
       "email_sent_to": "sam.lee@example.com",
       "order_type": "pickup",
       "items": [
@@ -172,9 +172,9 @@ Let me know if you’d like to order for pickup or delivery, or if you have any 
 ]
 ```
 
-**DineSync**: Your order is confirmed: 2 Chargrilled Chicken Burgers and 1 Skin-On Fries for pickup. Total: £31.00.
+**DineSync**: Your order for 2 Chargrilled Chicken Burgers and 1 side of Skin-On Fries (pickup, £31.00) is confirmed. A receipt has been sent to your email.
 
-A confirmation email has been sent to sam.lee@example.com. Please pay using this Stripe link: https://buy.stripe.com/test_4gM5kFeBdahW1dk6RU1kA0A
+Please pay securely here: https://buy.stripe.com/test_28E28tdx90HmcW2b8a1kA18
 
-Thank you, Sam! Your food will be ready for pickup soon.
+Thank you, Sam! Let us know if you need anything else.
 

@@ -4,7 +4,7 @@
 - **Category**: `edge_case`
 - **Status**: `PASSED`
 - **Verification**: Calculated and placed order accurately after mid-turn adjustments
-- **Date**: 2026-10-21 19:36:55
+- **Date**: 2026-10-22 13:18:24
 
 ## Conversation Transcript
 
@@ -96,13 +96,15 @@
 ]
 ```
 
-**DineSync**: You'd like two Chargrilled Chicken Burgers and two Skin-On Fries for pickup. Could I have your name, phone number, and email address to place your order and send your confirmation?
+**DineSync**: Great choice! To confirm, you’d like 2 chargrilled chicken burgers and 2 skin-on fries for pickup.
+
+Could I please have your name, phone number, and email address to place your order and send your confirmation?
 
 ### Turn 2
 
 **Customer**: Actually make it one chicken burger, one fish and chips, and remove all fries.
 
-**DineSync**: No problem! Your updated order is one Chargrilled Chicken Burger and one Beer-Battered Fish & Chips for pickup, with no extra fries.
+**DineSync**: No problem! Your updated order is 1 chargrilled chicken burger and 1 beer-battered fish & chips for pickup.
 
 Could I have your name, phone number, and email address to place your order and send your confirmation?
 
@@ -135,7 +137,7 @@ Could I have your name, phone number, and email address to place your order and 
       "success": true,
       "order_id": "O0008",
       "total": 27.5,
-      "payment_link": "https://buy.stripe.com/test_14A9AVakXahW4pwcce1kA0E",
+      "payment_link": "https://buy.stripe.com/test_fZu9AVbp13Ty3lsgsu1kA1c",
       "email_sent_to": "priya@example.com",
       "order_type": "pickup",
       "items": [
@@ -160,9 +162,9 @@ Could I have your name, phone number, and email address to place your order and 
 ]
 ```
 
-**DineSync**: Your order is confirmed: one Chargrilled Chicken Burger and one Beer-Battered Fish & Chips for pickup. Total is £27.50.
+**DineSync**: Your order is confirmed: 1 chargrilled chicken burger and 1 beer-battered fish & chips for pickup. Total is £27.50.
 
-A confirmation has been sent to priya@example.com. Please pay securely here: https://buy.stripe.com/test_14A9AVakXahW4pwcce1kA0E
+A confirmation has been sent to priya@example.com. Please pay using this secure Stripe link: https://buy.stripe.com/test_fZu9AVbp13Ty3lsgsu1kA1c
 
-Thank you, Priya!
+Thank you, Priya! Your receipt is in your email.
 

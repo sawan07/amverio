@@ -142,10 +142,18 @@ def run_tool(domain_id: str, name: str, tool_input: dict) -> dict:
     tool_functions = domain.get_domain(domain_id)["tool_functions"]
     fn = tool_functions.get(name)
     if fn is None:
+        log.error("run_tool error: Unknown tool %r for domain %r (input=%s)", name, domain_id, tool_input)
         return {"error": f"Unknown tool: {name}"}
     try:
-        return fn(**tool_input)
+        log.info("Executing tool: domain=%s tool=%s args=%s", domain_id, name, tool_input)
+        result = fn(**tool_input)
+        if isinstance(result, dict) and result.get("success") is False:
+            log.warning("Tool %s returned failure: %s (args=%s)", name, result.get("reason"), tool_input)
+        else:
+            log.info("Tool %s succeeded (args=%s)", name, tool_input)
+        return result
     except Exception as e:
+        log.exception("Tool execution failed: tool=%s input=%s error=%s", name, tool_input, e)
         return {"error": str(e)}
 
 
@@ -342,6 +350,7 @@ def chat(req: ChatRequest, request: Request):
     max_turns_retained = PRO_MAX_TURNS if is_pro else PUBLIC_MAX_TURNS
 
     client = _client()
+    log.info("Chat incoming: thread_id=%s domain=%s ip=%s pro=%s message=%r", req.thread_id, domain_id, client_ip, is_pro, message)
     messages.append({"role": "user", "content": message})
 
     hops = 0
@@ -373,7 +382,7 @@ def chat(req: ChatRequest, request: Request):
         for call in msg.tool_calls:
             args = json.loads(call.function.arguments or "{}")
             result = run_tool(domain_id, call.function.name, args)
-            log.info("tool_call thread=%s domain=%s name=%s args=%s (pro=%s)", req.thread_id, domain_id, call.function.name, args, is_pro)
+            log.info("Chat tool_call finished: thread=%s domain=%s name=%s args=%s -> result=%s", req.thread_id, domain_id, call.function.name, args, result)
             messages.append({
                 "role": "tool",
                 "tool_call_id": call.id,
@@ -384,6 +393,7 @@ def chat(req: ChatRequest, request: Request):
     if len(messages) > max_turns_retained:
         messages[:] = [messages[0]] + messages[-(max_turns_retained - 1):]
 
+    log.info("Chat reply sent: thread_id=%s reply_preview=%r", req.thread_id, reply[:120] if reply else "")
     return ChatResponse(thread_id=req.thread_id, reply=reply)
 
 

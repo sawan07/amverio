@@ -4,7 +4,7 @@
 - **Category**: `baseline`
 - **Status**: `PASSED`
 - **Verification**: Called book_table after availability check
-- **Date**: 2026-10-21 19:35:53
+- **Date**: 2026-10-22 13:17:26
 
 ## Conversation Transcript
 
@@ -50,11 +50,11 @@
       "name": "Alex Morgan",
       "phone": "07123456789",
       "status": "CONFIRMED",
-      "created_at": "2026-10-21 19:35"
+      "created_at": "2026-10-22 13:17"
     }
   }
 ]
 ```
 
-**DineSync**: Your table for 4 is booked this Friday at 7pm, Alex. We look forward to welcoming you! If you need to make any changes, just let me know.
+**DineSync**: Your table for 4 is booked this Friday at 7pm, Alex. We look forward to welcoming you! If you need to make any changes, just let us know.
 

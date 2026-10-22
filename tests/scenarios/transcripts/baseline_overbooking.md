@@ -4,7 +4,7 @@
 - **Category**: `baseline`
 - **Status**: `PASSED`
 - **Verification**: Correctly declined overbooking beyond capacity
-- **Date**: 2026-10-21 19:36:09
+- **Date**: 2026-10-22 13:17:40
 
 ## Conversation Transcript
 
@@ -18,20 +18,20 @@
   {
     "tool": "check_table_availability",
     "args": {
-      "date": "2026-10-21",
+      "date": "2026-10-22",
       "time": "19:00",
       "party_size": 12
     },
     "result": {
       "available": false,
-      "date": "2026-10-21",
+      "date": "2026-10-22",
       "time": "19:00",
       "party_size": 12,
-      "reason": "That date/time has already passed."
+      "reason": "No table of sufficient size is free at that time."
     }
   }
 ]
 ```
 
-**DineSync**: I'm sorry, but 7pm tonight has already passed. If you'd like to book for a later time this evening or another date, just let me know your preferred time!
+**DineSync**: I'm sorry, we don't have a table available for 12 tonight at 7pm. Would you like to try a different time, or perhaps split into smaller groups? Let me know what works for you!
 

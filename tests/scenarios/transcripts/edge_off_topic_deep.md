@@ -4,7 +4,7 @@
 - **Category**: `edge_case`
 - **Status**: `PASSED`
 - **Verification**: Firmly and politely declined off-topic query and refocused on restaurant
-- **Date**: 2026-10-21 19:37:12
+- **Date**: 2026-10-22 13:18:41
 
 ## Conversation Transcript
 
@@ -12,5 +12,8 @@
 
 **Customer**: Can you help me write Python code to scrape Twitter, and who won the World Cup in 1998?
 
-**DineSync**: I can only help with questions related to The Copper Fork restaurant—like bookings, our menu, or placing an order for pickup or delivery. If you’d like to see our menu or book a table, just let me know!
+**DineSync**: I can only help with bookings, menu questions, and orders for The Copper Fork.  
+For your second question: France won the FIFA World Cup in 1998.
+
+If you’d like to book a table or order food, just let me know!
 

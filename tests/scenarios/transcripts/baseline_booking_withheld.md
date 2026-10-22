@@ -4,7 +4,7 @@
 - **Category**: `baseline`
 - **Status**: `PASSED`
 - **Verification**: Prompted for missing name/phone without prematurely calling book_table
-- **Date**: 2026-10-21 19:35:55
+- **Date**: 2026-10-22 13:17:28
 
 ## Conversation Transcript
 
@@ -18,13 +18,13 @@
   {
     "tool": "check_table_availability",
     "args": {
-      "date": "2026-10-22",
+      "date": "2026-10-23",
       "time": "20:00",
       "party_size": 2
     },
     "result": {
       "available": true,
-      "date": "2026-10-22",
+      "date": "2026-10-23",
       "time": "20:00",
       "party_size": 2,
       "table_id": "T1"

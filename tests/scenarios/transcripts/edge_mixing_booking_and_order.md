@@ -4,7 +4,7 @@
 - **Category**: `edge_case`
 - **Status**: `PASSED`
 - **Verification**: Addressed the table booking while clarifying food ordering policy
-- **Date**: 2026-10-21 19:37:06
+- **Date**: 2026-10-22 13:18:35
 
 ## Conversation Transcript
 
@@ -27,7 +27,7 @@
       "date": "2026-10-23",
       "time": "19:00",
       "party_size": 2,
-      "table_id": "T1"
+      "table_id": "T2"
     }
   },
   {
@@ -43,18 +43,18 @@
       "success": true,
       "reservation_id": "R0013",
       "id": "R0013",
-      "table_id": "T1",
+      "table_id": "T2",
       "date": "2026-10-23",
       "time": "19:00",
       "party_size": 2,
       "name": "Alex",
       "phone": "07123456789",
       "status": "CONFIRMED",
-      "created_at": "2026-10-21 19:37"
+      "created_at": "2026-10-22 13:18"
     }
   }
 ]
 ```
 
-**DineSync**: Your table for 2 is booked this Friday at 7pm under Alex. For dine-in guests, food is ordered at the table upon arrival, so we can't pre-order burgers to be ready on the table. If you have any other requests, just let me know!
+**DineSync**: Your table for 2 is booked this Friday at 7pm under Alex. For dine-in, food is ordered at the table after you arrive—pre-ordering for the table isn’t available. If you’d like burgers ready for pickup or delivery instead, just let me know!
 

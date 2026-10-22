@@ -433,6 +433,9 @@ def add_order(order: dict) -> dict:
         if not is_pg:
             conn.commit()
         return order
+    except Exception as e:
+        log.exception("Database error in add_order for %s: %s", order.get("id"), e)
+        raise
     finally:
         cur.close()
         conn.close()
@@ -516,6 +519,9 @@ def add_reservation(res: dict) -> dict:
         if not is_pg:
             conn.commit()
         return res
+    except Exception as e:
+        log.exception("Database error in add_reservation for %s: %s", res.get("id"), e)
+        raise
     finally:
         cur.close()
         conn.close()

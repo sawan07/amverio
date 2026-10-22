@@ -4,7 +4,7 @@
 - **Category**: `edge_case`
 - **Status**: `PASSED`
 - **Verification**: Adjusted party size to 4 and checked/booked for 4
-- **Date**: 2026-10-21 19:36:43
+- **Date**: 2026-10-22 13:18:11
 
 ## Conversation Transcript
 
@@ -27,7 +27,7 @@
       "date": "2026-10-23",
       "time": "19:00",
       "party_size": 2,
-      "table_id": "T1"
+      "table_id": "T2"
     }
   },
   {
@@ -43,20 +43,20 @@
       "success": true,
       "reservation_id": "R0011",
       "id": "R0011",
-      "table_id": "T1",
+      "table_id": "T2",
       "date": "2026-10-23",
       "time": "19:00",
       "party_size": 2,
       "name": "Jordan Blake",
       "phone": "07111222333",
       "status": "CONFIRMED",
-      "created_at": "2026-10-21 19:36"
+      "created_at": "2026-10-22 13:18"
     }
   }
 ]
 ```
 
-**DineSync**: Your table for 2 is booked this Friday at 7pm under Jordan Blake. We look forward to welcoming you! If you need to make any changes, just let me know.
+**DineSync**: Your table for 2 is booked this Friday at 7pm under Jordan Blake. We look forward to welcoming you! If you need to make any changes, just let us know.
 
 ### Turn 2
 
@@ -110,7 +110,7 @@
       "name": "Jordan Blake",
       "phone": "07111222333",
       "status": "CONFIRMED",
-      "created_at": "2026-10-21 19:36"
+      "created_at": "2026-10-22 13:18"
     }
   }
 ]

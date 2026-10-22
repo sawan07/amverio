@@ -4,7 +4,7 @@
 - **Category**: `edge_case`
 - **Status**: `PASSED`
 - **Verification**: Handled professionally and booked table without reacting defensively
-- **Date**: 2026-10-21 19:36:34
+- **Date**: 2026-10-22 13:18:03
 
 ## Conversation Transcript
 
@@ -18,13 +18,13 @@
   {
     "tool": "check_table_availability",
     "args": {
-      "date": "2026-10-22",
+      "date": "2026-10-23",
       "time": "19:30",
       "party_size": 2
     },
     "result": {
       "available": true,
-      "date": "2026-10-22",
+      "date": "2026-10-23",
       "time": "19:30",
       "party_size": 2,
       "table_id": "T1"
@@ -33,7 +33,7 @@
   {
     "tool": "book_table",
     "args": {
-      "date": "2026-10-22",
+      "date": "2026-10-23",
       "time": "19:30",
       "party_size": 2,
       "customer_name": "Mark Evans",
@@ -44,13 +44,13 @@
       "reservation_id": "R0009",
       "id": "R0009",
       "table_id": "T1",
-      "date": "2026-10-22",
+      "date": "2026-10-23",
       "time": "19:30",
       "party_size": 2,
       "name": "Mark Evans",
       "phone": "07123456789",
       "status": "CONFIRMED",
-      "created_at": "2026-10-21 19:36"
+      "created_at": "2026-10-22 13:18"
     }
   }
 ]

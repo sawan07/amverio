@@ -4,7 +4,7 @@
 - **Category**: `edge_case`
 - **Status**: `PASSED`
 - **Verification**: Explained placed orders cannot be cancelled via chat and directed to call restaurant
-- **Date**: 2026-10-21 19:37:01
+- **Date**: 2026-10-22 13:18:29
 
 ## Conversation Transcript
 
@@ -96,9 +96,9 @@
 ]
 ```
 
-**DineSync**: You'd like one Chargrilled Chicken Burger for pickup, under the name Liam. The total is £13.50.
+**DineSync**: You'd like one Chargrilled Chicken Burger for pickup. The total is £13.50.
 
-Once I place your order, you'll get a confirmation email and a Stripe payment link here in the chat. Shall I go ahead and place this order for you?
+Once I place your order, you'll get a confirmation email with all the details, and a Stripe payment link will appear here for you to pay. Shall I go ahead and place your order now?
 
 ### Turn 2
 
@@ -125,7 +125,7 @@ Once I place your order, you'll get a confirmation email and a Stripe payment li
       "success": true,
       "order_id": "O0009",
       "total": 13.5,
-      "payment_link": "https://buy.stripe.com/test_cNi8wR2Sv3Tyg8e0tw1kA0F",
+      "payment_link": "https://buy.stripe.com/test_cNicN78cPbm08FMb8a1kA1d",
       "email_sent_to": "liam@example.com",
       "order_type": "pickup",
       "items": [
@@ -143,9 +143,9 @@ Once I place your order, you'll get a confirmation email and a Stripe payment li
 ]
 ```
 
-**DineSync**: Your order for 1 Chargrilled Chicken Burger for pickup is placed. The total is £13.50.
+**DineSync**: Your order for one Chargrilled Chicken Burger for pickup is confirmed—total is £13.50. A receipt has been sent to liam@example.com.
 
-A confirmation has been sent to liam@example.com. Please pay using this Stripe link: https://buy.stripe.com/test_cNi8wR2Sv3Tyg8e0tw1kA0F
+To complete your order, please pay securely here: https://buy.stripe.com/test_cNicN78cPbm08FMb8a1kA1d
 
 Thank you, Liam!
 
@@ -153,5 +153,5 @@ Thank you, Liam!
 
 **Customer**: Wait! I changed my mind, can you cancel that order and remove the burger?
 
-**DineSync**: I'm not able to cancel or change orders once they've been placed via chat. Please call the restaurant directly as soon as possible, and they'll assist you with your request.
+**DineSync**: I'm not able to cancel or change orders once they've been placed via chat. Please call the restaurant directly, and the team will help you with your request. Let me know if you need anything else!
 
