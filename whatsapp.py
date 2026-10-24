@@ -9,6 +9,7 @@ Meta / WhatsApp Policy:
 """
 
 import os
+import re
 import json
 import logging
 from typing import Optional, Any, Union
@@ -121,6 +122,64 @@ TEMPLATES = {
         },
     },
 }
+
+
+# ---------------------------------------------------------------------------
+# Text formatting helpers (shared by the Twilio and Meta Cloud API paths)
+# ---------------------------------------------------------------------------
+
+def format_for_whatsapp(text: str) -> str:
+    """
+    Adapts standard Markdown text to WhatsApp-native formatting:
+    - Markdown bold **bold** -> *bold* (WhatsApp uses single asterisks for bold)
+    - Markdown headers ### Header -> *Header*
+    - Markdown links [Label](url) -> Label: url
+    """
+    if not text:
+        return ""
+    # Convert markdown links [Label](URL) -> Label: URL
+    formatted = re.sub(r"\[([^\]]+)\]\((https?://[^\)]+)\)", r"\1: \2", text)
+    # Convert markdown headers: ### Title -> *Title*
+    formatted = re.sub(r"(?:^|(?<=\n)|(?<=\s))#{1,6}\s*(.+?)(?=\n|$)", r"*\1*", formatted)
+    # Convert **bold** -> *bold*
+    formatted = re.sub(r"\*\*(.+?)\*\*", r"*\1*", formatted)
+    return formatted.strip()
+
+
+def split_message(text: str, max_length: int = 1500) -> list[str]:
+    """
+    Splits replies longer than max_length into conversational chunks,
+    preferring paragraph breaks, newlines, sentence ends, or spaces.
+    """
+    if not text:
+        return []
+    if len(text) <= max_length:
+        return [text]
+
+    chunks = []
+    remaining = text
+    while len(remaining) > max_length:
+        split_idx = remaining.rfind("\n\n", 0, max_length)
+        if split_idx == -1 or split_idx < max_length // 2:
+            split_idx = remaining.rfind("\n", 0, max_length)
+        if split_idx == -1 or split_idx < max_length // 2:
+            split_idx = remaining.rfind(". ", 0, max_length)
+            if split_idx != -1:
+                split_idx += 1
+        if split_idx == -1 or split_idx < max_length // 2:
+            split_idx = remaining.rfind(" ", 0, max_length)
+        if split_idx == -1:
+            split_idx = max_length
+
+        chunk = remaining[:split_idx].strip()
+        if chunk:
+            chunks.append(chunk)
+        remaining = remaining[split_idx:].strip()
+
+    if remaining:
+        chunks.append(remaining)
+
+    return chunks
 
 
 def normalize_whatsapp_number(phone: str) -> str:

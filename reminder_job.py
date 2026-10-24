@@ -5,6 +5,7 @@ Finds upcoming CONFIRMED reservations within the reminder window (default: 3 hou
 that have not yet received a reminder, and delivers a WhatsApp reminder:
 - Uses friendly free-form text if within the customer's 24-hour service window.
 - Uses the pre-approved 'booking_reminder' template if outside the 24-hour window.
+- Sends through Twilio by default, or the direct Meta Cloud API when WHATSAPP_PROVIDER=meta.
 - Marks the reservation as notified to prevent duplicate reminders.
 
 Usage:
@@ -26,6 +27,19 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 log = logging.getLogger("amverio.reminder_job")
+
+
+def _get_sender(client: Optional[Any]):
+    """
+    Picks the outbound provider. WHATSAPP_PROVIDER=meta uses the direct Meta Cloud API
+    (`client` is then an optional HTTP object for tests); anything else keeps the
+    Twilio path (`client` is then an optional Twilio client).
+    """
+    provider = os.environ.get("WHATSAPP_PROVIDER", "twilio").strip().lower()
+    if provider == "meta":
+        import meta_whatsapp
+        return lambda **kw: meta_whatsapp.send_whatsapp(http=client, **kw)
+    return lambda **kw: whatsapp.send_whatsapp(client=client, **kw)
 
 
 def run_booking_reminders(
@@ -51,6 +65,7 @@ def run_booking_reminders(
     due_reservations = db.get_due_reminders(hours_ahead=hours_ahead, reference_dt=ref_dt)
     log.info("Found %d reservation(s) due for reminders.", len(due_reservations))
 
+    send = _get_sender(client)
     results = []
     for res in due_reservations:
         res_id = res.get("id")
@@ -84,10 +99,9 @@ def run_booking_reminders(
                     f"at The Copper Fork is booked for today at {res_time}. "
                     f"We look forward to welcoming you! Need to adjust? Just let us know."
                 )
-                dispatch_res = whatsapp.send_whatsapp(
+                dispatch_res = send(
                     to=whatsapp_to,
                     text=body_text,
-                    client=client,
                     dry_run=dry_run,
                     now_ts=ref_dt.timestamp(),
                 )
@@ -100,11 +114,10 @@ def run_booking_reminders(
                     "3": res_time,
                     "4": "The Copper Fork",
                 }
-                dispatch_res = whatsapp.send_whatsapp(
+                dispatch_res = send(
                     to=whatsapp_to,
                     template="booking_reminder",
                     variables=template_vars,
-                    client=client,
                     dry_run=dry_run,
                     now_ts=ref_dt.timestamp(),
                 )
