@@ -40,8 +40,8 @@ if os.path.exists(_env_file):
     except Exception:
         pass
 
-from fastapi import FastAPI, HTTPException, Request, Response, Header, Cookie, Depends
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request, Response, Header, Cookie, Depends, BackgroundTasks
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
@@ -52,6 +52,8 @@ import data
 import db
 import chat as chat_engine
 from twilio.request_validator import RequestValidator
+import whatsapp as whatsapp_layer
+import meta_whatsapp
 from twilio.twiml.messaging_response import MessagingResponse
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -596,58 +598,10 @@ def _evict_stale_message_sids() -> None:
         _processed_message_sids.pop(sid, None)
 
 
-def _format_for_whatsapp(text: str) -> str:
-    """
-    Adapts standard Markdown text to WhatsApp-native formatting:
-    - Markdown bold **bold** -> *bold* (WhatsApp uses single asterisks for bold)
-    - Markdown headers ### Header -> *Header*
-    - Markdown links [Label](url) -> Label: url
-    """
-    if not text:
-        return ""
-    # Convert markdown links [Label](URL) -> Label: URL
-    formatted = re.sub(r"\[([^\]]+)\]\((https?://[^\)]+)\)", r"\1: \2", text)
-    # Convert markdown headers: ### Title -> *Title*
-    formatted = re.sub(r"(?:^|(?<=\n)|(?<=\s))#{1,6}\s*(.+?)(?=\n|$)", r"*\1*", formatted)
-    # Convert **bold** -> *bold*
-    formatted = re.sub(r"\*\*(.+?)\*\*", r"*\1*", formatted)
-    return formatted.strip()
-
-
-def _split_whatsapp_message(text: str, max_length: int = 1500) -> list[str]:
-    """
-    Splits replies longer than max_length into conversational chunks,
-    preferring paragraph breaks, newlines, sentence ends, or spaces.
-    """
-    if not text:
-        return []
-    if len(text) <= max_length:
-        return [text]
-
-    chunks = []
-    remaining = text
-    while len(remaining) > max_length:
-        split_idx = remaining.rfind("\n\n", 0, max_length)
-        if split_idx == -1 or split_idx < max_length // 2:
-            split_idx = remaining.rfind("\n", 0, max_length)
-        if split_idx == -1 or split_idx < max_length // 2:
-            split_idx = remaining.rfind(". ", 0, max_length)
-            if split_idx != -1:
-                split_idx += 1
-        if split_idx == -1 or split_idx < max_length // 2:
-            split_idx = remaining.rfind(" ", 0, max_length)
-        if split_idx == -1:
-            split_idx = max_length
-
-        chunk = remaining[:split_idx].strip()
-        if chunk:
-            chunks.append(chunk)
-        remaining = remaining[split_idx:].strip()
-
-    if remaining:
-        chunks.append(remaining)
-
-    return chunks
+# Formatting helpers now live in whatsapp.py (shared with the Meta Cloud API path);
+# the old private names are kept so existing callers and tests keep working.
+_format_for_whatsapp = whatsapp_layer.format_for_whatsapp
+_split_whatsapp_message = whatsapp_layer.split_message
 
 
 def _validate_twilio_signature(request: Request, form_data: dict) -> bool:
@@ -751,6 +705,89 @@ async def twilio_whatsapp_webhook(request: Request):
         resp.message(chunk)
 
     return Response(content=str(resp), media_type="application/xml")
+
+
+# ---------------------------------------------------------------------------
+# Meta WhatsApp Cloud API Webhook (direct, no Twilio)
+#   GET  /webhooks/meta/whatsapp  -> Meta's one-off verification handshake
+#   POST /webhooks/meta/whatsapp  -> inbound messages + delivery statuses
+# Unlike Twilio, the reply is NOT the HTTP response: Meta needs a fast 200, so the
+# agent runs in a background task and the answer goes out via the Graph API.
+# ---------------------------------------------------------------------------
+META_FALLBACK_REPLY = "I'm having a little trouble right now. Please give us a call at the restaurant or try again shortly."
+META_UNSUPPORTED_REPLY = (
+    "Thanks for sharing that! Currently, I can only read text messages. "
+    "Please send your question or request as text."
+)
+
+
+@app.get("/webhooks/meta/whatsapp")
+def meta_whatsapp_verify(request: Request):
+    q = request.query_params
+    challenge = meta_whatsapp.verify_webhook_challenge(
+        q.get("hub.mode"), q.get("hub.verify_token"), q.get("hub.challenge")
+    )
+    if challenge is None:
+        raise HTTPException(status_code=403, detail="Webhook verification failed.")
+    return PlainTextResponse(challenge)
+
+
+def _process_meta_message(from_number: str, msg: dict) -> None:
+    """Runs in the background: ask the agent, send the reply. Never raises."""
+    text = msg.get("text", "")
+    try:
+        if not text:
+            reply = META_UNSUPPORTED_REPLY
+        else:
+            try:
+                reply = chat_engine.respond(session_id=from_number, user_text=text, domain_id="restaurant")
+            except Exception as e:
+                log.exception("Error generating agent reply for %s: %s", from_number, e)
+                reply = META_FALLBACK_REPLY
+        meta_whatsapp.send_reply(from_number, reply)
+    except Exception as e:
+        log.exception("Could not deliver Meta WhatsApp reply to %s: %s", from_number, e)
+
+
+@app.post("/webhooks/meta/whatsapp")
+async def meta_whatsapp_webhook(request: Request, background: BackgroundTasks):
+    raw_body = await request.body()
+
+    # 1. Signature validation (X-Hub-Signature-256, signed with the Meta App Secret)
+    if not meta_whatsapp.verify_signature(raw_body, request.headers.get("x-hub-signature-256")):
+        raise HTTPException(status_code=403, detail="Invalid Meta signature.")
+
+    try:
+        payload = json.loads(raw_body or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload.")
+
+    # 2. Each inbound message: dedupe (Meta retries), track the 24h window, hand to the agent
+    _evict_stale_message_sids()
+    accepted = 0
+    for msg in meta_whatsapp.parse_inbound(payload):
+        message_id = msg["message_id"]
+        if message_id:
+            if message_id in _processed_message_sids:
+                log.info("Ignoring duplicate Meta message id: %s", message_id)
+                continue
+            _processed_message_sids[message_id] = time.time()
+
+        # Same key format as the Twilio path ("whatsapp:+44..."), so a customer's
+        # conversation and 24h window carry over if you switch provider.
+        from_number = whatsapp_layer.normalize_whatsapp_number(msg["from"])
+        try:
+            db.record_whatsapp_inbound(
+                from_number, msg["text"], timestamp=meta_whatsapp.inbound_timestamp(msg["timestamp"])
+            )
+        except Exception as e:
+            log.warning("Could not record WhatsApp inbound timestamp for %s: %s", from_number, e)
+
+        background.add_task(_process_meta_message, from_number, msg)
+        accepted += 1
+
+    # Delivery-status updates and duplicates land here too; always 200 so Meta stops retrying.
+    return {"status": "ok", "accepted": accepted}
 
 
 @app.get("/api/whatsapp/sessions/{phone}")
