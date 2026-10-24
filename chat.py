@@ -32,20 +32,40 @@ if os.path.exists(_env_file):
 
 from openai import OpenAI
 import domain
+import db
 
 MODEL = os.environ.get("AMVERIO_MODEL", "gpt-4.1")
 
-# Conversation history kept per session in memory
-# TODO: Persist session history to SQLite/PostgreSQL store in future persistence card
+# Conversation history: hot copy in memory, durable copy in the database
+# (conversations table), so a restart/redeploy doesn't make the agent forget a
+# customer who is mid-booking. Restored lazily when a session is next used.
 SESSIONS: dict[str, dict] = {}
 SESSION_TTL_SECONDS = 60 * 60 * 6  # 6 hours TTL
+_PURGE_EVERY_SECONDS = 600
+_last_purge = 0.0
 
 
 def _evict_stale_sessions() -> None:
+    global _last_purge
     now = time.time()
     stale = [sid for sid, s in SESSIONS.items() if now - s.get("last_seen", 0) > SESSION_TTL_SECONDS]
     for sid in stale:
         SESSIONS.pop(sid, None)
+    # Also clear expired rows from the database, at most every few minutes.
+    if now - _last_purge > _PURGE_EVERY_SECONDS:
+        _last_purge = now
+        try:
+            db.delete_stale_conversations(now - SESSION_TTL_SECONDS)
+        except Exception as e:
+            log.warning("Could not purge stale conversations: %s", e)
+
+
+def _persist_session(session_id: str, session: dict) -> None:
+    """Save history to the database. Never lets a storage problem break a reply."""
+    try:
+        db.save_conversation(session_id, session["domain"], session["messages"], session["last_seen"])
+    except Exception as e:
+        log.warning("Could not persist conversation %s: %s", session_id, e)
 
 
 def _build_system_prompt(domain_cfg: dict) -> str:
@@ -59,12 +79,25 @@ def _build_system_prompt(domain_cfg: dict) -> str:
 def _get_or_create_session(session_id: str, domain_id: str) -> dict:
     _evict_stale_sessions()
     if session_id not in SESSIONS:
-        domain_cfg = domain.get_domain(domain_id)
-        SESSIONS[session_id] = {
-            "domain": domain_id,
-            "messages": [{"role": "system", "content": _build_system_prompt(domain_cfg)}],
-            "last_seen": time.time(),
-        }
+        restored = None
+        try:
+            restored = db.load_conversation(session_id)
+        except Exception as e:
+            log.warning("Could not load conversation %s: %s", session_id, e)
+        if restored and time.time() - restored["last_seen"] <= SESSION_TTL_SECONDS:
+            log.info("Restored conversation %s from database (%d messages)", session_id, len(restored["messages"]))
+            SESSIONS[session_id] = {
+                "domain": restored["domain"],
+                "messages": restored["messages"],
+                "last_seen": time.time(),
+            }
+        else:
+            domain_cfg = domain.get_domain(domain_id)
+            SESSIONS[session_id] = {
+                "domain": domain_id,
+                "messages": [{"role": "system", "content": _build_system_prompt(domain_cfg)}],
+                "last_seen": time.time(),
+            }
     else:
         SESSIONS[session_id]["last_seen"] = time.time()
     return SESSIONS[session_id]
@@ -138,6 +171,7 @@ def respond(
 
         if not msg.tool_calls:
             session["last_seen"] = time.time()
+            _persist_session(session_id, session)
             reply = msg.content or ""
             log.info("respond reply: session_id=%s preview=%r", session_id, reply[:120] if reply else "")
             return reply

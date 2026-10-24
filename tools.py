@@ -199,25 +199,36 @@ def book_table(date: str, time: str, party_size: int, customer_name: str, custom
         log.warning("book_table rejected: availability check failed: %s", availability.get("reason"))
         return {"success": False, "reason": availability.get("reason", "No table available.")}
 
-    reservation = {
-        "id": next_reservation_id(),
-        "table_id": availability["table_id"],
-        "date": date,
-        "time": time,
-        "party_size": party_size,
-        "name": customer_name,
-        "phone": customer_phone,
-        "status": "CONFIRMED",
-        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-    }
+    # Claim a table atomically: the "is it still free?" check and the insert
+    # happen in one database transaction, so two customers asking for the last
+    # table at the same moment can't both get it. If another booking grabbed
+    # the first-choice table since the check above, fall through to the next
+    # smallest table that fits.
+    candidates = sorted((t for t in TABLES if t["seats"] >= party_size), key=lambda t: t["seats"])
     try:
-        db.add_reservation(reservation)
-        log.info("book_table succeeded: reservation_id=%s table=%s", reservation["id"], reservation["table_id"])
+        for table in candidates:
+            reservation = db.add_reservation_if_free(
+                {
+                    "table_id": table["id"],
+                    "date": date,
+                    "time": time,
+                    "party_size": party_size,
+                    "name": customer_name,
+                    "phone": customer_phone,
+                    "status": "CONFIRMED",
+                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                },
+                DEFAULT_SEATING_MINUTES,
+            )
+            if reservation:
+                log.info("book_table succeeded: reservation_id=%s table=%s", reservation["id"], reservation["table_id"])
+                return {"success": True, "reservation_id": reservation["id"], **reservation}
     except Exception as e:
-        log.exception("book_table DB insert failed for reservation %s: %s", reservation.get("id"), e)
+        log.exception("book_table DB insert failed: %s", e)
         return {"success": False, "reason": "Database error while confirming reservation. Please try again."}
 
-    return {"success": True, "reservation_id": reservation["id"], **reservation}
+    log.warning("book_table rejected: no table free at commit time for party_size=%s at %s %s", party_size, date, time)
+    return {"success": False, "reason": "No table of sufficient size is free at that time."}
 
 
 def cancel_reservation(reservation_id: str, **kwargs) -> dict:

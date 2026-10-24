@@ -6,3 +6,9 @@ __pycache__/
 .secrets*
 *.db
 *.sqlite3
+
+# SQLite runtime data (see README "Data persistence")
+data/
+*.db-journal
+*.db-wal
+*.db-shm

@@ -18,7 +18,24 @@ from typing import Optional, Any
 log = logging.getLogger("amverio.db")
 
 _here = os.path.dirname(os.path.abspath(__file__))
-SQLITE_DB_PATH = os.path.join(_here, "amverio.db")
+
+
+def _resolve_sqlite_path() -> str:
+    """
+    Where the SQLite file lives. Set AMVERIO_DB_PATH to put it on a persistent
+    volume (e.g. /app/data/amverio.db in Docker/Coolify). Default: ./data/amverio.db
+    next to this file. Ignored when DATABASE_URL points at PostgreSQL.
+    """
+    configured = os.environ.get("AMVERIO_DB_PATH", "").strip()
+    path = configured or os.path.join(_here, "data", "amverio.db")
+    return os.path.abspath(os.path.expanduser(path))
+
+
+SQLITE_DB_PATH = _resolve_sqlite_path()
+
+# Arbitrary constant used as the PostgreSQL advisory-lock key that serialises
+# bookings and ID allocation (SQLite uses BEGIN IMMEDIATE for the same job).
+_PG_LOCK_KEY = 7_204_117
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
@@ -49,9 +66,22 @@ def _get_connection():
             log.warning("PostgreSQL connection failed (%s); falling back to SQLite (%s)", e, SQLITE_DB_PATH)
     
     # SQLite fallback
+    os.makedirs(os.path.dirname(SQLITE_DB_PATH), exist_ok=True)
     conn = sqlite3.connect(SQLITE_DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
+    try:
+        # WAL: readers don't block the writer, and a crash mid-write can't
+        # corrupt the file. busy_timeout makes concurrent writers wait, not fail.
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=10000;")
+    except sqlite3.Error as e:  # e.g. a filesystem that can't do WAL
+        log.warning("Could not enable WAL on %s: %s", SQLITE_DB_PATH, e)
     return conn
+
+
+def _seed_enabled() -> bool:
+    return os.environ.get("AMVERIO_SEED_DEMO_DATA", "1").strip().lower() not in ("0", "false", "no", "off")
 
 
 def init_db() -> None:
@@ -152,6 +182,30 @@ def init_db() -> None:
             """)
             conn.commit()
 
+        # Conversation history (so a restart doesn't make the agent forget a
+        # customer mid-booking), ID counters, and a lookup index.
+        text_id = "VARCHAR(128)" if is_pg else "TEXT"
+        real_t = "DOUBLE PRECISION" if is_pg else "REAL"
+        cur.execute(f"""
+        CREATE TABLE IF NOT EXISTS conversations (
+            session_id {text_id} PRIMARY KEY,
+            domain {text_id} NOT NULL,
+            messages TEXT NOT NULL,
+            last_seen {real_t} NOT NULL,
+            created_at {text_id} NOT NULL,
+            updated_at {text_id} NOT NULL
+        );
+        """)
+        cur.execute(f"""
+        CREATE TABLE IF NOT EXISTS counters (
+            name {text_id} PRIMARY KEY,
+            value INTEGER NOT NULL
+        );
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_reservations_table_date ON reservations (table_id, date);")
+        if not is_pg:
+            conn.commit()
+
         # Schema migrations for existing tables
         try:
             if is_pg:
@@ -165,23 +219,26 @@ def init_db() -> None:
         except Exception as e:
             log.warning("Could not add reminder_sent_at column to reservations: %s", e)
 
-        # Check if orders need seeding
-        cur.execute("SELECT COUNT(*) FROM orders;")
-        order_count = cur.fetchone()[0]
-        if order_count == 0:
-            _seed_orders(cur, is_pg)
-            if not is_pg:
-                conn.commit()
+        # Demo seed data (3 sample orders + 3 sample bookings) only goes into an
+        # EMPTY database, and can be switched off for a real pilot with
+        # AMVERIO_SEED_DEMO_DATA=0 so fake bookings never block real tables.
+        if _seed_enabled():
+            cur.execute("SELECT COUNT(*) FROM orders;")
+            if cur.fetchone()[0] == 0:
+                _seed_orders(cur, is_pg)
+                if not is_pg:
+                    conn.commit()
 
-        # Check if reservations need seeding
-        cur.execute("SELECT COUNT(*) FROM reservations;")
-        res_count = cur.fetchone()[0]
-        if res_count == 0:
-            _seed_reservations(cur, is_pg)
-            if not is_pg:
-                conn.commit()
+            cur.execute("SELECT COUNT(*) FROM reservations;")
+            if cur.fetchone()[0] == 0:
+                _seed_reservations(cur, is_pg)
+                if not is_pg:
+                    conn.commit()
 
-        log.info("Database initialized successfully (engine=%s)", "PostgreSQL" if is_pg else "SQLite")
+        if is_pg:
+            log.info("Database initialized successfully (engine=PostgreSQL)")
+        else:
+            log.info("Database initialized successfully (engine=SQLite, path=%s)", SQLITE_DB_PATH)
     finally:
         cur.close()
         conn.close()
@@ -720,36 +777,205 @@ def is_inside_24h_window(phone_number: str, now_ts: Optional[float] = None) -> b
     return 0 <= elapsed <= (24 * 3600)
 
 
-def get_next_order_id() -> str:
-    """Generate next sequential order ID (e.g. O0004)."""
-    orders = get_orders()
+def _ph(sql: str, is_pg: bool) -> str:
+    """Write queries with ? placeholders; convert to %s for PostgreSQL."""
+    return sql.replace("?", "%s") if is_pg else sql
+
+
+def _begin_exclusive(conn, cur, is_pg: bool) -> None:
+    """
+    Start a write transaction that other writers must wait for. This is what
+    stops two simultaneous requests from double-booking a table or being handed
+    the same order ID.
+    """
+    if is_pg:
+        conn.autocommit = False
+        cur.execute("SELECT pg_advisory_xact_lock(%s);", (_PG_LOCK_KEY,))
+    else:
+        cur.execute("BEGIN IMMEDIATE;")
+
+
+def _allocate_id(cur, is_pg: bool, table: str, prefix: str) -> str:
+    """
+    Next sequential ID (O0004, R0007...). Must run inside _begin_exclusive.
+    Uses max(existing ids, stored counter) + 1, so an ID is never reused even
+    if the latest row is later deleted.
+    """
+    cur.execute(f"SELECT id FROM {table};")  # `table` is an internal constant
     max_num = 0
-    for o in orders:
-        oid = o.get("id", "")
-        if oid.startswith("O"):
+    for row in cur.fetchall():
+        rid = str(row[0])
+        if rid.startswith(prefix):
             try:
-                num = int(oid[1:])
-                if num > max_num:
-                    max_num = num
+                max_num = max(max_num, int(rid[len(prefix):]))
             except ValueError:
                 pass
-    return f"O{max_num + 1:04d}"
+    cur.execute(_ph("SELECT value FROM counters WHERE name = ?;", is_pg), (table,))
+    row = cur.fetchone()
+    counter = int(row[0]) if row else 0
+    new_num = max(max_num, counter) + 1
+    if row:
+        cur.execute(_ph("UPDATE counters SET value = ? WHERE name = ?;", is_pg), (new_num, table))
+    else:
+        cur.execute(_ph("INSERT INTO counters (name, value) VALUES (?, ?);", is_pg), (table, new_num))
+    return f"{prefix}{new_num:04d}"
+
+
+def _next_id(table: str, prefix: str) -> str:
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    try:
+        _begin_exclusive(conn, cur, is_pg)
+        new_id = _allocate_id(cur, is_pg, table, prefix)
+        conn.commit()
+        return new_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_next_order_id() -> str:
+    """Reserve and return the next sequential order ID (e.g. O0004). Safe under concurrency."""
+    return _next_id("orders", "O")
 
 
 def get_next_reservation_id() -> str:
-    """Generate next sequential reservation ID (e.g. R0004)."""
-    res = get_reservations()
-    max_num = 0
-    for r in res:
-        rid = r.get("id", "")
-        if rid.startswith("R"):
+    """Reserve and return the next sequential reservation ID (e.g. R0004). Safe under concurrency."""
+    return _next_id("reservations", "R")
+
+
+def add_reservation_if_free(res: dict, seating_minutes: int = 90) -> Optional[dict]:
+    """
+    Atomically insert a reservation only if its table is still free for the
+    seating window. Returns the saved reservation (with an ID assigned if it
+    had none), or None if the table was taken in the meantime.
+
+    The check and the insert happen inside ONE exclusive transaction, so two
+    simultaneous requests for the same table can never both succeed.
+    """
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    try:
+        _begin_exclusive(conn, cur, is_pg)
+        new_start = datetime.strptime(f"{res['date']} {res['time']}", "%Y-%m-%d %H:%M")
+        new_end = new_start + timedelta(minutes=seating_minutes)
+
+        cur.execute(
+            _ph("SELECT time FROM reservations WHERE table_id = ? AND date = ? AND status = 'CONFIRMED';", is_pg),
+            (res["table_id"], res["date"]),
+        )
+        for row in cur.fetchall():
             try:
-                num = int(rid[1:])
-                if num > max_num:
-                    max_num = num
+                other_start = datetime.strptime(f"{res['date']} {row[0]}", "%Y-%m-%d %H:%M")
             except ValueError:
-                pass
-    return f"R{max_num + 1:04d}"
+                continue
+            other_end = other_start + timedelta(minutes=seating_minutes)
+            if new_start < other_end and new_end > other_start:
+                conn.rollback()
+                return None
+
+        saved = dict(res)
+        if not saved.get("id"):
+            saved["id"] = _allocate_id(cur, is_pg, "reservations", "R")
+        saved.setdefault("created_at", datetime.now().strftime("%Y-%m-%d %H:%M"))
+        cur.execute(
+            _ph(
+                "INSERT INTO reservations (id, table_id, date, time, party_size, name, phone, status, created_at, reminder_sent_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+                is_pg,
+            ),
+            (
+                saved["id"], saved["table_id"], saved["date"], saved["time"], int(saved["party_size"]),
+                saved["name"], saved["phone"], saved["status"], saved["created_at"], saved.get("reminder_sent_at"),
+            ),
+        )
+        conn.commit()
+        return saved
+    except Exception:
+        conn.rollback()
+        log.exception("Database error in add_reservation_if_free for table %s", res.get("table_id"))
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Conversation history persistence
+# ---------------------------------------------------------------------------
+
+def save_conversation(session_id: str, domain_id: str, messages: list, last_seen: Optional[float] = None) -> None:
+    """Insert or update a conversation's full message history."""
+    import time
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    now_iso = datetime.now().isoformat()
+    try:
+        cur.execute(
+            _ph(
+                "INSERT INTO conversations (session_id, domain, messages, last_seen, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT (session_id) DO UPDATE SET "
+                "domain = excluded.domain, messages = excluded.messages, "
+                "last_seen = excluded.last_seen, updated_at = excluded.updated_at;",
+                is_pg,
+            ),
+            (
+                session_id, domain_id, json.dumps(messages, default=str),
+                last_seen if last_seen is not None else time.time(), now_iso, now_iso,
+            ),
+        )
+        if not is_pg:
+            conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def load_conversation(session_id: str) -> Optional[dict]:
+    """Return {"session_id", "domain", "messages", "last_seen"} or None."""
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            _ph("SELECT session_id, domain, messages, last_seen FROM conversations WHERE session_id = ?;", is_pg),
+            (session_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        try:
+            messages = json.loads(row[2])
+        except Exception:
+            log.warning("Conversation %s has unreadable history; ignoring it", session_id)
+            return None
+        return {"session_id": row[0], "domain": row[1], "messages": messages, "last_seen": float(row[3])}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def delete_stale_conversations(cutoff_ts: float) -> int:
+    """Delete conversations last used before cutoff_ts. Returns how many were removed."""
+    is_pg = _is_postgres()
+    conn = _get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(_ph("DELETE FROM conversations WHERE last_seen < ?;", is_pg), (cutoff_ts,))
+        removed = cur.rowcount
+        if not is_pg:
+            conn.commit()
+        return removed
+    finally:
+        cur.close()
+        conn.close()
 
 
 # Run initialization on import
